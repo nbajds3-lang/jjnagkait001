@@ -2208,10 +2208,19 @@
 
     var knownSet = {};
     (state.settings.branches || []).forEach(function(n){ knownSet[n] = true; });
+    // 미등록 지점명별 "최초 접수일"을 함께 기록 — "신규" 표시는 최초 등장일로부터
+    // 2주 동안만 보여주고, 2주가 지나면 배지 없이(목록 자체는 유지) 표시
     var unregistered = {};
+    var firstSeenAt = {};
     (state.tickets || []).forEach(function(t){
-      if(t.branch && !knownSet[t.branch]) unregistered[t.branch] = true;
+      if(!t.branch || knownSet[t.branch]) return;
+      unregistered[t.branch] = true;
+      var created = new Date(t.createdAt).getTime();
+      if(!isNaN(created) && (!firstSeenAt[t.branch] || created < firstSeenAt[t.branch])){
+        firstSeenAt[t.branch] = created;
+      }
     });
+    var NEW_BADGE_WINDOW_MS = 14 * 24 * 60 * 60 * 1000; // 2주
     var allNames = (state.settings.branches || []).concat(Object.keys(unregistered));
 
     var items = allNames.filter(function(n){
@@ -2230,7 +2239,8 @@
             '<button type="button" data-remove="branches" data-value="'+esc(n)+'" aria-label="삭제">' +
             '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>' +
             '</button>';
-          var badge = isNew ? '<span style="opacity:.6;font-weight:400;flex:none;" title="접수 데이터에는 있지만 지점 목록에 등록되지 않음 — 이동하면 등록됩니다">신규</span>' : '';
+          var showNewBadge = isNew && firstSeenAt[n] && (Date.now() - firstSeenAt[n] < NEW_BADGE_WINDOW_MS);
+          var badge = showNewBadge ? '<span style="opacity:.6;font-weight:400;flex:none;" title="접수 데이터에는 있지만 지점 목록에 등록되지 않음 — 이동하면 등록됩니다 (최초 등장 후 2주 동안만 표시)">신규</span>' : '';
           return '<span class="rule-tag">' +
             '<input type="checkbox" class="branch-move-check" data-branch="'+esc(n)+'"'+checked+'>' +
             '<span class="rule-tag-label" title="'+esc(n)+'">'+esc(n)+'</span>' +
