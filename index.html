@@ -1106,6 +1106,11 @@
         </select>
         <select id="flt-category"><option value="">전체 분류</option></select>
         <select id="flt-type"><option value="">전체 유형</option></select>
+        <select id="flt-branch-group">
+          <option value="">전체 구분</option>
+          <option value="branch">지점</option>
+          <option value="hq">본사</option>
+        </select>
         <select id="flt-branch"><option value="">전체 지점</option></select>
         <span class="count-note" id="list-count-note"></span>
       </div>
@@ -1526,6 +1531,7 @@
     selectedTicketIds: {}, // 접수 목록 bulk-select: id -> true
     listPage: 1,
     listBranchFilter: null, // 통계현황에서 지점 클릭 시 접수목록에 적용되는 지점 필터
+    listBranchGroup: '',   // 접수목록 필터의 구분(지점/본사) 선택값 — 지점 select 옵션을 좁히는 데 사용
     listDelayFilter: false, // 대시보드의 "한달 이상 지연" 클릭 시 접수목록에 적용되는 지연 필터
     __currentPageTicketIds: []
   };
@@ -3006,6 +3012,12 @@
   function goToBranchList(branch){
     state.listBranchFilter = branch;
     state.listDelayFilter = false;
+    // 클릭한 지점이 지점/본사 중 어느 그룹인지 맞춰서 구분 select도 함께 갱신
+    var hqSet = {};
+    (state.settings.hqBranches || []).forEach(function(n){ hqSet[n] = true; });
+    state.listBranchGroup = hqSet[branch] ? 'hq' : 'branch';
+    if($('#flt-branch-group')) $('#flt-branch-group').value = state.listBranchGroup;
+    if($('#flt-branch')) renderListFilterOptions();
     if($('#flt-branch')) $('#flt-branch').value = branch;
     state.listPage = 1;
     setActiveTab('list');
@@ -3016,10 +3028,13 @@
   function goToStatusList(status){
     state.listBranchFilter = null;
     state.listDelayFilter = false;
+    state.listBranchGroup = '';
     if($('#flt-keyword')) $('#flt-keyword').value = '';
     if($('#flt-status')) $('#flt-status').value = status;
     if($('#flt-category')) $('#flt-category').value = '';
     if($('#flt-type')) $('#flt-type').value = '';
+    if($('#flt-branch-group')) $('#flt-branch-group').value = '';
+    if($('#flt-branch')) renderListFilterOptions();
     if($('#flt-branch')) $('#flt-branch').value = '';
     state.listPage = 1;
     setActiveTab('list');
@@ -3030,10 +3045,13 @@
   function goToDelayedList(){
     state.listBranchFilter = null;
     state.listDelayFilter = true;
+    state.listBranchGroup = '';
     if($('#flt-keyword')) $('#flt-keyword').value = '';
     if($('#flt-status')) $('#flt-status').value = '';
     if($('#flt-category')) $('#flt-category').value = '';
     if($('#flt-type')) $('#flt-type').value = '';
+    if($('#flt-branch-group')) $('#flt-branch-group').value = '';
+    if($('#flt-branch')) renderListFilterOptions();
     if($('#flt-branch')) $('#flt-branch').value = '';
     state.listPage = 1;
     setActiveTab('list');
@@ -3089,19 +3107,31 @@
     }).join('');
     if(state.settings.types.indexOf(prevType) !== -1) typeSel.value = prevType;
 
+    // 구분(지점/본사) select에서 고른 값으로 지점 select의 옵션을 좁힘
+    var branchGroup = state.listBranchGroup || '';
     var branchSel = $('#flt-branch');
     var prevBranch = branchSel.value;
-    branchSel.innerHTML = '<option value="">전체 지점</option>' + getSortedBranches().map(function(b){
+    var groupBranches = getSortedBranches(branchGroup || undefined);
+    branchSel.innerHTML = '<option value="">전체 지점</option>' + groupBranches.map(function(b){
       return '<option value="'+esc(b)+'">'+esc(b)+'</option>';
     }).join('');
-    if(prevBranch) branchSel.value = prevBranch;
+    branchSel.value = (prevBranch && groupBranches.indexOf(prevBranch) !== -1) ? prevBranch : '';
   }
 
   function initListFilters(){
+    if($('#flt-branch-group')) $('#flt-branch-group').value = state.listBranchGroup || '';
     renderListFilterOptions();
     ['flt-keyword','flt-status','flt-category','flt-type'].forEach(function(id){
       $('#'+id).addEventListener('input', function(){ state.listPage = 1; renderList(); });
       $('#'+id).addEventListener('change', function(){ state.listPage = 1; renderList(); });
+    });
+    $('#flt-branch-group').addEventListener('change', function(){
+      state.listBranchGroup = $('#flt-branch-group').value || '';
+      // 구분이 바뀌면 이전에 고른 특정 지점은 더 이상 유효하지 않을 수 있으므로 초기화
+      state.listBranchFilter = null;
+      renderListFilterOptions();
+      state.listPage = 1;
+      renderList();
     });
     $('#flt-branch').addEventListener('change', function(){
       state.listBranchFilter = $('#flt-branch').value || null;
@@ -3119,7 +3149,9 @@
     $('#btn-clear-branch-filter').addEventListener('click', function(){
       state.listBranchFilter = null;
       state.listDelayFilter = false;
-      if($('#flt-branch')) $('#flt-branch').value = '';
+      state.listBranchGroup = '';
+      if($('#flt-branch-group')) $('#flt-branch-group').value = '';
+      renderListFilterOptions();
       state.listPage = 1;
       renderList();
     });
