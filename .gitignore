@@ -1,0 +1,20 @@
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Firebase 서비스 계정 키 / 비밀 값 — 절대 커밋 금지
+serviceAccountKey.json
+*.serviceaccount.json
+.env
+.env.*
+
+# 데이터 마이그레이션 산출물 (실제 회원/접수 데이터 — 저장소에 올리지 않음)
+migration/export/
+migration/*.json
+
+# OS / 에디터
+.DS_Store
+.vscode/
+node_modules/
