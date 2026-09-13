@@ -290,13 +290,7 @@
     color:var(--ink-muted);
   }
   .rule-tag button:hover{ background:var(--critical-soft); color:var(--critical); }
-  .rule-tag .btn-move{
-    width:auto; height:20px; border-radius:999px; padding:0 8px;
-    background:var(--surface); border:1px solid var(--border-strong);
-    font-size:10.5px; font-weight:600; color:var(--ink-muted); white-space:nowrap;
-  }
-  .rule-tag .btn-move:hover{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent-soft-strong); }
-  .rule-group-label{ padding:10px 16px 2px; font-size:11.5px; font-weight:700; color:var(--ink-muted); }
+  .rule-tag .branch-move-check{ margin:0 1px 0 0; width:13px; height:13px; flex:none; }
   .rule-add{ display:flex; gap:8px; padding:0 16px 16px; }
   .rule-add input{
     flex:1; min-width:0; padding:8px 10px; border:1px solid var(--border-strong);
@@ -1228,12 +1222,16 @@
         <div class="card">
           <div style="padding:16px 16px 4px;">
             <h3 style="font-size:13.5px;">지점</h3>
-            <p class="chart-sub" style="margin-bottom:0;">로그인 시 선택하는 지점 목록입니다. 목록에 없어도 직접 입력할 수 있습니다. 지점/본사로 구분해 관리할 수 있습니다.</p>
+            <p class="chart-sub" style="margin-bottom:8px;">로그인 시 선택하는 지점 목록입니다. 목록에 없어도 직접 입력할 수 있습니다.</p>
+            <div class="chip-group" id="branch-tab-chip">
+              <button type="button" class="chip selected" data-branch-tab="branch">지점</button>
+              <button type="button" class="chip" data-branch-tab="hq">본사</button>
+            </div>
           </div>
-          <div class="rule-group-label">지점</div>
           <div class="rule-list scroll" id="rule-list-branches"></div>
-          <div class="rule-group-label">본사</div>
-          <div class="rule-list scroll" id="rule-list-branches-hq"></div>
+          <div style="display:flex;justify-content:flex-end;padding:0 16px 10px;">
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-move-branches" style="width:auto;" disabled>선택 항목 <span id="branch-move-target-label">본사</span>로 이동</button>
+          </div>
           <form class="rule-add" data-kind="branches">
             <input type="text" placeholder="새 지점명 입력 후 추가" maxlength="60">
             <button type="submit" class="btn btn-primary btn-sm" style="width:auto;">추가</button>
@@ -1513,6 +1511,8 @@
       branches: DEFAULT_BRANCHES.slice(),
       hqBranches: DEFAULT_HQ_BRANCHES.slice() // branches 중 "본사" 그룹으로 표시할 이름 목록
     },
+    branchRuleTab: 'branch',      // 기준관리 지점 카드의 현재 탭 (branch | hq)
+    branchRuleSelected: {},        // 기준관리 지점 카드에서 이동 대상으로 체크된 이름들
     settingsUnsub: null,
     ticketsUnsub: null,
     ticketsLoaded: false,
@@ -2175,51 +2175,97 @@
     });
   }
 
-  function branchTagHtml(name, isHq){
-    var moveLabel = isHq ? '지점으로' : '본사로';
-    return '<span class="rule-tag">'+esc(name)+
-      '<button type="button" class="btn-move" data-move-branch="'+esc(name)+'">'+moveLabel+'</button>' +
-      '<button type="button" data-remove="branches" data-value="'+esc(name)+'" aria-label="삭제">' +
-      '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>' +
-      '</button></span>';
-  }
-
-  /* 지점 목록을 "지점"/"본사" 두 그룹으로 나눠 렌더링.
+  /* 지점 목록을 "지점"/"본사" 탭으로 나눠 렌더링 — 한 번에 한 탭만 표시.
      그룹 구분은 state.settings.hqBranches(본사로 지정된 이름 목록)로만 판단하며,
-     실제 branches 배열 자체는 하나로 유지 — 로그인/필터 등 기존 기능은 그대로 동작 */
+     실제 branches 배열 자체는 하나로 유지 — 로그인/필터 등 기존 기능은 그대로 동작.
+     이동은 개별 버튼이 아니라: 체크박스로 여러 개 선택 → "선택 항목 OO로 이동" 버튼 */
   function renderBranchLists(){
-    var branchList = $('#rule-list-branches');
-    var hqList = $('#rule-list-branches-hq');
-    if(!branchList || !hqList) return;
+    var list = $('#rule-list-branches');
+    var tabWrap = $('#branch-tab-chip');
+    if(!list || !tabWrap) return;
+
+    var tab = state.branchRuleTab || 'branch';
     var hqSet = {};
     (state.settings.hqBranches || []).forEach(function(n){ hqSet[n] = true; });
-    var branchItems = state.settings.branches.filter(function(n){ return !hqSet[n]; });
-    var hqItems = state.settings.branches.filter(function(n){ return hqSet[n]; });
+    var items = state.settings.branches.filter(function(n){
+      return tab === 'hq' ? !!hqSet[n] : !hqSet[n];
+    });
 
-    branchList.innerHTML = branchItems.length
-      ? branchItems.map(function(n){ return branchTagHtml(n, false); }).join('')
-      : '<div class="empty-members" style="padding:16px 0;">등록된 지점이 없습니다.</div>';
-    hqList.innerHTML = hqItems.length
-      ? hqItems.map(function(n){ return branchTagHtml(n, true); }).join('')
-      : '<div class="empty-members" style="padding:16px 0;">본사로 이동된 지점이 없습니다.</div>';
+    $all('.chip', tabWrap).forEach(function(chip){
+      chip.classList.toggle('selected', chip.getAttribute('data-branch-tab') === tab);
+    });
 
-    $all('[data-remove="branches"]', branchList).concat($all('[data-remove="branches"]', hqList)).forEach(function(btn){
+    list.innerHTML = items.length
+      ? items.map(function(n){
+          var checked = state.branchRuleSelected[n] ? ' checked' : '';
+          return '<span class="rule-tag">' +
+            '<input type="checkbox" class="branch-move-check" data-branch="'+esc(n)+'"'+checked+'>' +
+            esc(n) +
+            '<button type="button" data-remove="branches" data-value="'+esc(n)+'" aria-label="삭제">' +
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>' +
+            '</button></span>';
+        }).join('')
+      : '<div class="empty-members" style="padding:16px 0;">등록된 '+(tab==='hq'?'본사':'지점')+'이(가) 없습니다.</div>';
+
+    $all('[data-remove="branches"]', list).forEach(function(btn){
       btn.addEventListener('click', function(){
         removeRuleItem('branches', btn.getAttribute('data-value'), '지점');
       });
     });
-    $all('[data-move-branch]', branchList).concat($all('[data-move-branch]', hqList)).forEach(function(btn){
-      btn.addEventListener('click', function(){
-        toggleBranchGroup(btn.getAttribute('data-move-branch'));
+    $all('.branch-move-check', list).forEach(function(cb){
+      cb.addEventListener('change', function(){
+        var name = cb.getAttribute('data-branch');
+        if(cb.checked) state.branchRuleSelected[name] = true; else delete state.branchRuleSelected[name];
+        updateBranchMoveButton();
       });
     });
+
+    var targetLabel = $('#branch-move-target-label');
+    if(targetLabel) targetLabel.textContent = tab === 'hq' ? '지점' : '본사';
+    updateBranchMoveButton();
   }
 
-  function toggleBranchGroup(name){
-    var current = state.settings.hqBranches || [];
-    var isHq = current.indexOf(name) !== -1;
-    var next = isHq ? current.filter(function(n){ return n !== name; }) : current.concat([name]);
-    updateSettings({ hqBranches: next });
+  function updateBranchMoveButton(){
+    var btn = $('#btn-move-branches');
+    if(!btn) return;
+    btn.disabled = Object.keys(state.branchRuleSelected).length === 0;
+  }
+
+  /* 탭 전환 / 선택 이동 버튼은 정적 요소라 렌더할 때마다 다시 바인딩하면 안 됨
+     (재렌더 시 addEventListener가 계속 누적되어 클릭 시 여러 번 실행되는
+     버그가 생김 — 접수 등록 중복 버그와 같은 종류) → init()에서 한 번만 바인딩 */
+  function initBranchRuleControls(){
+    var tabWrap = $('#branch-tab-chip');
+    if(tabWrap){
+      $all('.chip', tabWrap).forEach(function(chip){
+        chip.addEventListener('click', function(){
+          state.branchRuleTab = chip.getAttribute('data-branch-tab');
+          state.branchRuleSelected = {};
+          renderBranchLists();
+        });
+      });
+    }
+    var moveBtn = $('#btn-move-branches');
+    if(moveBtn){
+      moveBtn.addEventListener('click', function(){
+        var selected = Object.keys(state.branchRuleSelected);
+        if(!selected.length) return;
+        var tab = state.branchRuleTab || 'branch';
+        var current = state.settings.hqBranches || [];
+        var nextHq;
+        if(tab === 'branch'){
+          // 지점 탭에서 선택 → 본사로 이동
+          var currentSet = {}; current.forEach(function(n){ currentSet[n] = true; });
+          nextHq = current.concat(selected.filter(function(n){ return !currentSet[n]; }));
+        } else {
+          // 본사 탭에서 선택 → 지점으로 이동
+          var selSet = {}; selected.forEach(function(n){ selSet[n] = true; });
+          nextHq = current.filter(function(n){ return !selSet[n]; });
+        }
+        state.branchRuleSelected = {};
+        updateSettings({ hqBranches: nextHq });
+      });
+    }
   }
 
   function removeRuleItem(kind, value, label){
@@ -3727,6 +3773,7 @@
     bindTabs();
     initRegisterForm();
     initListFilters();
+    initBranchRuleControls();
     bindModal();
     bindConfirmAndNotify();
     bindGlobalEvents();
