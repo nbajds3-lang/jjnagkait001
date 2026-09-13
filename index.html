@@ -291,6 +291,8 @@
   }
   .rule-tag button:hover{ background:var(--critical-soft); color:var(--critical); }
   .rule-tag .branch-move-check{ margin:0 1px 0 0; width:13px; height:13px; flex:none; }
+  #rule-list-branches .rule-tag{ width:118px; box-sizing:border-box; }
+  #rule-list-branches .rule-tag-label{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .rule-add{ display:flex; gap:8px; padding:0 16px 16px; }
   .rule-add input{
     flex:1; min-width:0; padding:8px 10px; border:1px solid var(--border-strong);
@@ -1223,8 +1225,7 @@
         <div class="card">
           <div style="padding:16px 16px 4px;">
             <h3 style="font-size:13.5px;">지점</h3>
-            <p class="chart-sub" style="margin-bottom:8px;">로그인 시 선택하는 지점 목록입니다. 목록에 없어도 직접 입력할 수 있습니다.</p>
-            <div style="font-size:11.5px;color:var(--ink-2);margin-bottom:6px;">지점 &gt; 구분</div>
+            <p class="chart-sub" style="margin-bottom:8px;">지점 &gt; 구분</p>
             <div class="chip-group" id="branch-tab-chip">
               <button type="button" class="chip chip-eq selected" data-branch-tab="branch">지점</button>
               <button type="button" class="chip chip-eq" data-branch-tab="hq">본사</button>
@@ -2216,10 +2217,11 @@
             '<button type="button" data-remove="branches" data-value="'+esc(n)+'" aria-label="삭제">' +
             '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>' +
             '</button>';
-          var badge = isNew ? ' <span style="opacity:.6;font-weight:400;" title="접수 데이터에는 있지만 지점 목록에 등록되지 않음 — 이동하면 등록됩니다">(신규)</span>' : '';
+          var badge = isNew ? '<span style="opacity:.6;font-weight:400;flex:none;" title="접수 데이터에는 있지만 지점 목록에 등록되지 않음 — 이동하면 등록됩니다">신규</span>' : '';
           return '<span class="rule-tag">' +
             '<input type="checkbox" class="branch-move-check" data-branch="'+esc(n)+'"'+checked+'>' +
-            esc(n) + badge +
+            '<span class="rule-tag-label" title="'+esc(n)+'">'+esc(n)+'</span>' +
+            badge +
             removeBtn +
             '</span>';
         }).join('')
