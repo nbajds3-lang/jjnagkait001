@@ -1367,6 +1367,17 @@
   <div class="notify-toast" id="notify-toast" hidden></div>
 </div>
 
+<!-- ==================================================================== -->
+<!-- FIREBASE SDK (compat build — API shape matches this app's existing   -->
+<!-- db.collection(...).doc(...) calls almost 1:1, so the rest of the app -->
+<!-- below needed no rewrite). Version pinned 2026-09 — check             -->
+<!-- https://firebase.google.com/docs/web/setup for a newer one before    -->
+<!-- going live.                                                          -->
+<!-- ==================================================================== -->
+<script src="https://www.gstatic.com/firebasejs/12.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.13.0/firebase-storage-compat.js"></script>
+
 <script>
 (function(){
   "use strict";
@@ -1402,6 +1413,49 @@
   var ADMIN_NAME = "장동식";
   var ADMIN_PHONE_DIGITS = "01094820353";
   var ADMIN_BRANCH = "본사";
+
+  /* ================================================================ */
+  /* FIREBASE CONFIG — Firebase 콘솔 > 프로젝트 설정 > 일반 > "내 앱"에서  */
+  /* 웹 앱을 추가하면 나오는 값을 그대로 붙여넣으세요. apiKey는 비밀키가   */
+  /* 아니라 프로젝트 식별용 공개 값이라 클라이언트 코드에 있어도 안전     */
+  /* 하지만, 실제 접근 제한은 반드시 firestore.rules로 걸어야 합니다.     */
+  /* ================================================================ */
+  var FIREBASE_CONFIG = {
+    apiKey: "여기에_API_KEY_붙여넣기",
+    authDomain: "여기에_PROJECT_ID.firebaseapp.com",
+    projectId: "여기에_PROJECT_ID",
+    storageBucket: "여기에_PROJECT_ID.appspot.com",
+    messagingSenderId: "여기에_MESSAGING_SENDER_ID",
+    appId: "여기에_APP_ID"
+  };
+  var firebaseAppInstance = null;
+  function getFirebaseApp(){
+    if(!firebaseAppInstance){
+      firebaseAppInstance = firebase.initializeApp(FIREBASE_CONFIG);
+    }
+    return firebaseAppInstance;
+  }
+
+  /* 첨부파일 저장을 Firebase Storage로 처리하는 얇은 래퍼 — 기존 코드가
+     기대하는 state.assets.upload(blob, {type}) / state.assets.delete(id)
+     시그니처를 그대로 맞춰서, 호출하는 쪽(첨부파일 로직)은 수정 불필요 */
+  function makeStorageAssets(storage){
+    return {
+      upload: function(blob, opts){
+        var id = 'att_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        var contentType = (opts && opts.type) || blob.type || 'application/octet-stream';
+        var ref = storage.ref().child('attachments/' + id);
+        return ref.put(blob, { contentType: contentType }).then(function(snapshot){
+          return ref.getDownloadURL().then(function(url){
+            return { id: id, url: url, sizeBytes: snapshot.totalBytes, contentType: contentType };
+          });
+        });
+      },
+      delete: function(id){
+        return storage.ref().child('attachments/' + id).delete();
+      }
+    };
+  }
 
   var MAX_ATTACHMENTS = 5;
   var IMAGE_MAX_DIM = 1600;
@@ -1681,39 +1735,40 @@
   /* ================================================================ */
   function resolveDb(){
     if(state.dbResolved) return Promise.resolve(state.db);
-    if(!window.claude || typeof window.claude.use !== 'function'){
+    if(typeof firebase === 'undefined'){
       state.db = false; state.dbResolved = true;
-      state.dbFailReason = 'no_window_claude';
+      state.dbFailReason = 'firebase_sdk_not_loaded';
       return Promise.resolve(false);
     }
-    return window.claude.use('db').then(function(db){
-      state.db = db || false;
+    try{
+      getFirebaseApp();
+      state.db = firebase.firestore();
       state.dbResolved = true;
-      if(!state.db) state.dbFailReason = 'use_resolved_null';
-      return state.db;
-    }).catch(function(err){
+      return Promise.resolve(state.db);
+    }catch(err){
       state.db = false; state.dbResolved = true;
-      state.dbFailReason = 'use_threw:' + ((err && err.message) || 'unknown');
-      return false;
-    });
+      state.dbFailReason = 'firebase_init_failed:' + ((err && err.message) || 'unknown');
+      return Promise.resolve(false);
+    }
   }
 
   function resolveAssets(){
     if(state.assetsResolved) return Promise.resolve(state.assets);
-    if(!window.claude || typeof window.claude.use !== 'function'){
+    if(typeof firebase === 'undefined'){
       state.assets = false; state.assetsResolved = true;
       return Promise.resolve(false);
     }
-    return window.claude.use('assets').then(function(assets){
-      state.assets = assets || false;
+    try{
+      getFirebaseApp();
+      state.assets = makeStorageAssets(firebase.storage());
       state.assetsResolved = true;
       renderAttachControlAvailability();
-      return state.assets;
-    }).catch(function(){
+      return Promise.resolve(state.assets);
+    }catch(err){
       state.assets = false; state.assetsResolved = true;
       renderAttachControlAvailability();
-      return false;
-    });
+      return Promise.resolve(false);
+    }
   }
 
   function routeIdentity(rawIdentity){
