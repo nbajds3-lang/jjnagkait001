@@ -30,20 +30,22 @@ if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
   process.exit(1);
 }
 
-let admin;
+let initializeApp, cert, getFirestore, Timestamp;
 try {
-  admin = require('firebase-admin');
+  ({ initializeApp, cert } = require('firebase-admin/app'));
+  ({ getFirestore, Timestamp } = require('firebase-admin/firestore'));
 } catch (e) {
-  console.error('❌ firebase-admin 패키지가 설치되어 있지 않습니다.');
+  console.error('❌ firebase-admin 패키지가 설치되어 있지 않거나 버전이 맞지 않습니다.');
   console.error('   다음을 먼저 실행하세요: npm install firebase-admin');
+  console.error('   (오류 상세:', e.message, ')');
   process.exit(1);
 }
 
-admin.initializeApp({
-  credential: admin.credential.cert(require(SERVICE_ACCOUNT_PATH)),
+initializeApp({
+  credential: cert(require(SERVICE_ACCOUNT_PATH)),
 });
 
-const db = admin.firestore();
+const db = getFirestore();
 
 const EXPORT_DIR = path.join(__dirname, 'export');
 const TICKETS_DIR = path.join(EXPORT_DIR, 'tickets', 'tickets');
@@ -62,7 +64,7 @@ function maybeConvertDates(data) {
   for (const f of DATE_FIELDS) {
     if (out[f] && typeof out[f] === 'string') {
       const d = new Date(out[f]);
-      if (!isNaN(d.getTime())) out[f] = admin.firestore.Timestamp.fromDate(d);
+      if (!isNaN(d.getTime())) out[f] = Timestamp.fromDate(d);
     }
   }
   return out;

@@ -1928,7 +1928,7 @@
   function subscribeTickets(db){
     if(state.ticketsUnsub) return;
     state.ticketsError = null;
-    state.ticketsUnsub = db.collection('tickets').orderBy('createdAt','desc').limit(1000).onSnapshot(function(snap){
+    state.ticketsUnsub = db.collection('tickets').orderBy('createdAt','desc').onSnapshot(function(snap){
       try{
         state.ticketsLoaded = true;
         state.ticketsError = null;
@@ -1986,7 +1986,7 @@
     if(state.membersUnsub) return;
     state.membersLoaded = false;
     state.membersError = null;
-    state.membersUnsub = db.collection('members').orderBy('requestedAt','desc').limit(1000).onSnapshot(function(snap){
+    state.membersUnsub = db.collection('members').orderBy('requestedAt','desc').onSnapshot(function(snap){
       try{
         state.membersLoaded = true;
         state.membersError = null;
