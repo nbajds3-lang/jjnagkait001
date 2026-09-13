@@ -1069,7 +1069,7 @@
         </div>
 
         <div class="card form-card mini-list">
-          <h3 id="mini-list-title">등록한 최근 접수</h3>
+          <h3 id="mini-list-title">접수내역</h3>
           <div id="mini-list-body"></div>
         </div>
       </div>
@@ -2443,11 +2443,19 @@
     if(state.db){
       state.db.collection('tickets').add(payload).then(function(ref){
         // show it immediately — don't wait on the live snapshot, which can
-        // lag a few seconds (or up to ~30s on periodic-refresh fallback)
-        var optimistic = Object.assign({}, payload, { id: ref.id, __pendingNew: true });
-        state.tickets.unshift(optimistic);
-        state.ordered.push(optimistic);
-        renderAll();
+        // lag a few seconds (or up to ~30s on periodic-refresh fallback).
+        // BUT the snapshot's local-cache echo can already have delivered
+        // this exact document (via subscribeTickets) before this .then()
+        // callback runs — unshifting again here would then add a SECOND
+        // array entry for the same document (visible as a duplicate row
+        // until the next full reload rebuilds state.tickets from scratch).
+        var alreadyPresent = state.tickets.some(function(t){ return t.id === ref.id; });
+        if(!alreadyPresent){
+          var optimistic = Object.assign({}, payload, { id: ref.id, __pendingNew: true });
+          state.tickets.unshift(optimistic);
+          state.ordered.push(optimistic);
+          renderAll();
+        }
         afterSubmit();
       }).catch(function(err){
         console.error('submit failed', err);
@@ -2470,7 +2478,7 @@
     var body = $('#mini-list-body');
 
     if(state.ticketsError){
-      if(title) title.textContent = '등록한 최근 접수';
+      if(title) title.textContent = '접수내역';
       body.innerHTML = '<div class="empty-state" style="padding:30px 0;"><span class="d">불러오지 못했습니다. <button type="button" class="btn btn-ghost btn-sm btn-retry-tickets" style="width:auto;">다시 시도</button></span></div>';
       $all('.btn-retry-tickets', body).forEach(function(btn){
         btn.addEventListener('click', function(){ retryDataConnection(); });
@@ -2478,7 +2486,7 @@
       return;
     }
     if(!state.ticketsLoaded){
-      if(title) title.textContent = '등록한 최근 접수';
+      if(title) title.textContent = '접수내역';
       body.innerHTML = '<div class="empty-state" style="padding:30px 0;"><span class="d">불러오는 중…</span></div>';
       return;
     }
@@ -2487,7 +2495,7 @@
       return t.branch === state.identity.branch && t.phone === state.identity.phone;
     });
     var mine = all.slice(0,5);
-    if(title) title.textContent = mine.length ? ('등록한 최근 접수 ' + mine.length + '건') : '등록한 최근 접수';
+    if(title) title.textContent = mine.length ? ('접수내역 ' + mine.length + '건') : '접수내역';
 
     if(!mine.length){
       body.innerHTML = '<div class="empty-state" style="padding:30px 0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M7 9h10M7 13h6"></path></svg><span class="t">등록한 접수가 없습니다</span><span class="d">왼쪽 폼에서 첫 접수를 등록해보세요.</span></div>';
@@ -2501,7 +2509,7 @@
       '</div>';
     }).join('');
     $all('.mini-ticket', body).forEach(function(row){
-      // 접수등록 탭의 "등록한 최근 접수"에서는 처리상태·답변은 조회만 가능 —
+      // 접수등록 탭의 "접수내역"에서는 처리상태·답변은 조회만 가능 —
       // 상태 변경/답변 작성은 접수목록에서 운영관리자·전체관리자만 수행
       row.addEventListener('click', function(){ openTicketModal(row.getAttribute('data-id'), { statusViewOnly: true }); });
     });
