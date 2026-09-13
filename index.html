@@ -1169,7 +1169,12 @@
       <div class="card">
         <div style="padding:16px 16px 4px;">
           <h3 style="font-size:13.5px;">지점별 접수현황 순위</h3>
-          <p class="chart-sub" style="margin-bottom:0;">접수 건수가 많은 지점 순으로 정렬됩니다.</p>
+          <p class="chart-sub" style="margin-bottom:8px;">접수 건수가 많은 지점 순으로 정렬됩니다.</p>
+          <div class="chip-group" id="stats-branch-group-chip">
+            <button type="button" class="chip chip-eq selected" data-stats-group="">전체</button>
+            <button type="button" class="chip chip-eq" data-stats-group="branch">지점</button>
+            <button type="button" class="chip chip-eq" data-stats-group="hq">본사</button>
+          </div>
         </div>
         <div class="ticket-cards" id="branch-rank-cards"></div>
         <div class="table-scroll">
@@ -1532,6 +1537,7 @@
     listPage: 1,
     listBranchFilter: null, // 통계현황에서 지점 클릭 시 접수목록에 적용되는 지점 필터
     listBranchGroup: '',   // 접수목록 필터의 구분(지점/본사) 선택값 — 지점 select 옵션을 좁히는 데 사용
+    statsBranchGroup: '',  // 통계현황 지점별 순위의 구분(전체/지점/본사) 선택값
     listDelayFilter: false, // 대시보드의 "한달 이상 지연" 클릭 시 접수목록에 적용되는 지연 필터
     __currentPageTicketIds: []
   };
@@ -2956,6 +2962,22 @@
   /* ================================================================ */
   function renderStatsView(){
     var list = dashboardScopedTickets();
+    // 구분(전체/지점/본사) 선택에 따라 해당 그룹의 지점 데이터만 집계
+    var group = state.statsBranchGroup || '';
+    if(group === 'branch' || group === 'hq'){
+      var hqSet = {};
+      (state.settings.hqBranches || []).forEach(function(n){ hqSet[n] = true; });
+      list = list.filter(function(t){
+        var b = t.branch || '미지정';
+        return group === 'hq' ? !!hqSet[b] : !hqSet[b];
+      });
+    }
+    var chipWrap = $('#stats-branch-group-chip');
+    if(chipWrap){
+      $all('.chip', chipWrap).forEach(function(chip){
+        chip.classList.toggle('selected', (chip.getAttribute('data-stats-group') || '') === group);
+      });
+    }
     var cardsWrap = $('#branch-rank-cards');
     var tbody = $('#branch-rank-tbody');
     if(!list.length){
@@ -3005,6 +3027,19 @@
     $all('[data-branch]', tbody).concat($all('[data-branch]', cardsWrap)).forEach(function(el){
       el.addEventListener('click', function(){
         goToBranchList(el.getAttribute('data-branch'));
+      });
+    });
+  }
+
+  /* 통계현황의 구분(전체/지점/본사) 칩은 정적 요소라 렌더할 때마다 다시 바인딩하면
+     안 됨(누적 바인딩 버그 방지) → init()에서 한 번만 바인딩 */
+  function initStatsControls(){
+    var chipWrap = $('#stats-branch-group-chip');
+    if(!chipWrap) return;
+    $all('.chip', chipWrap).forEach(function(chip){
+      chip.addEventListener('click', function(){
+        state.statsBranchGroup = chip.getAttribute('data-stats-group') || '';
+        renderStatsView();
       });
     });
   }
@@ -3832,6 +3867,7 @@
     initRegisterForm();
     initListFilters();
     initBranchRuleControls();
+    initStatsControls();
     bindModal();
     bindConfirmAndNotify();
     bindGlobalEvents();
