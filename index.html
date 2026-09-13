@@ -291,8 +291,9 @@
   }
   .rule-tag button:hover{ background:var(--critical-soft); color:var(--critical); }
   .rule-tag .branch-move-check{ margin:0 1px 0 0; width:13px; height:13px; flex:none; }
-  #rule-list-branches .rule-tag{ width:118px; box-sizing:border-box; }
-  #rule-list-branches .rule-tag-label{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #rule-list-branches{ justify-content:flex-start; }
+  #rule-list-branches .rule-tag{ width:186px; box-sizing:border-box; justify-content:flex-start; }
+  #rule-list-branches .rule-tag-label{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; }
   .rule-add{ display:flex; gap:8px; padding:0 16px 16px; }
   .rule-add input{
     flex:1; min-width:0; padding:8px 10px; border:1px solid var(--border-strong);
@@ -1224,8 +1225,8 @@
 
         <div class="card">
           <div style="padding:16px 16px 4px;">
-            <h3 style="font-size:13.5px;">지점</h3>
-            <p class="chart-sub" style="margin-bottom:8px;">지점 &gt; 구분</p>
+            <h3 style="font-size:13.5px;">구분</h3>
+            <p class="chart-sub" style="margin-bottom:8px;">로그인 시 선택하는 지점 목록입니다. 목록에 없어도 직접 입력할 수 있습니다.</p>
             <div class="chip-group" id="branch-tab-chip">
               <button type="button" class="chip chip-eq selected" data-branch-tab="branch">지점</button>
               <button type="button" class="chip chip-eq" data-branch-tab="hq">본사</button>
