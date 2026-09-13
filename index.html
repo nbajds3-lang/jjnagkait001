@@ -290,6 +290,13 @@
     color:var(--ink-muted);
   }
   .rule-tag button:hover{ background:var(--critical-soft); color:var(--critical); }
+  .rule-tag .btn-move{
+    width:auto; height:20px; border-radius:999px; padding:0 8px;
+    background:var(--surface); border:1px solid var(--border-strong);
+    font-size:10.5px; font-weight:600; color:var(--ink-muted); white-space:nowrap;
+  }
+  .rule-tag .btn-move:hover{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent-soft-strong); }
+  .rule-group-label{ padding:10px 16px 2px; font-size:11.5px; font-weight:700; color:var(--ink-muted); }
   .rule-add{ display:flex; gap:8px; padding:0 16px 16px; }
   .rule-add input{
     flex:1; min-width:0; padding:8px 10px; border:1px solid var(--border-strong);
@@ -1094,6 +1101,7 @@
         </select>
         <select id="flt-category"><option value="">전체 분류</option></select>
         <select id="flt-type"><option value="">전체 유형</option></select>
+        <select id="flt-branch"><option value="">전체 지점</option></select>
         <span class="count-note" id="list-count-note"></span>
       </div>
 
@@ -1213,9 +1221,12 @@
         <div class="card">
           <div style="padding:16px 16px 4px;">
             <h3 style="font-size:13.5px;">지점</h3>
-            <p class="chart-sub" style="margin-bottom:0;">로그인 시 선택하는 지점 목록입니다. 목록에 없어도 직접 입력할 수 있습니다.</p>
+            <p class="chart-sub" style="margin-bottom:0;">로그인 시 선택하는 지점 목록입니다. 목록에 없어도 직접 입력할 수 있습니다. 지점/본사로 구분해 관리할 수 있습니다.</p>
           </div>
+          <div class="rule-group-label">지점</div>
           <div class="rule-list scroll" id="rule-list-branches"></div>
+          <div class="rule-group-label">본사</div>
+          <div class="rule-list scroll" id="rule-list-branches-hq"></div>
           <form class="rule-add" data-kind="branches">
             <input type="text" placeholder="새 지점명 입력 후 추가" maxlength="60">
             <button type="submit" class="btn btn-primary btn-sm" style="width:auto;">추가</button>
@@ -1393,6 +1404,7 @@
     "기타"
   ];
   var DEFAULT_TYPES = ["문제", "오류", "기타"];
+  var DEFAULT_HQ_BRANCHES = ["본사"]; // DEFAULT_BRANCHES 중 기본적으로 "본사" 그룹에 속하는 이름
   var DEFAULT_BRANCHES = ["IT","IT실","가산동점","가산디지털단지역점","가양역점","간석오가리역점","간석오거리역점","강남2호점","강남역1호점","강남역2호점","강동점","강남역 2호점","공덕역점","공릉동점","공릉점","관양시장점","광화문역점","교대역점","구로디지털점","구산역점","구의역점","군자역점","굽은다리역점","길동역점","낙성대점","난곡점","남구로점","남부터미널역점","노원점","논현역점","답십리점","당산역점","대치동점","동묘앞역점","둔촌동역점","마두역점","마포염리동점","명일역점","목동역점","문정법조타운점","문정점","미금점","박달시장점","방화역점","뱅뱅사거리점","범계역점","보라매점","봉천동점","부천신흥시장점","부천심곡점","부천역점","부평시장역점","부평역점","불광역점","사가정역점","사당역점","삼양사거리점","상계역점","서울대벤처타운역점","서울대입구점","서울시청역점","서현역점","선릉역점","선흥역점","성수역점","송파동점","수내점","수유역점","시흥동점","신길동점","신림동점","신설동역점","신정네거리역점","신중동점","쌍문역점","아차산역점","암사점","야탑역점","역곡역점","역삼동점","역삼역점","연신내역점","염창역점","영등포구청역점","영등포구청점","왕십리역점","우장산역점","은천점","응암동점","응암역점","응암오거리점","의정부역점","이수역점","인천산곡점","잠실점","장안동사거리점","종각역점","천호역점","천호초교점","테헤란로점","필라테스합정역점","하남시청역점","한티역점","합정역점","화곡역점","화정역점","본사"];
 
   var STATUS_CLASS = { "접수":"st-open", "처리중":"st-progress", "완료":"st-done" };
@@ -1491,7 +1503,8 @@
     settings: {           // live 기준관리 lists — fall back to defaults until loaded
       categories: DEFAULT_CATEGORIES.slice(),
       types: DEFAULT_TYPES.slice(),
-      branches: DEFAULT_BRANCHES.slice()
+      branches: DEFAULT_BRANCHES.slice(),
+      hqBranches: DEFAULT_HQ_BRANCHES.slice() // branches 중 "본사" 그룹으로 표시할 이름 목록
     },
     settingsUnsub: null,
     ticketsUnsub: null,
@@ -2022,10 +2035,17 @@
     state.settingsUnsub = db.doc('config/lists').onSnapshot(function(snap){
       if(snap.exists){
         var d = snap.data() || {};
+        var branches = (d.branches && d.branches.length) ? d.branches : DEFAULT_BRANCHES.slice();
+        // hqBranches는 나중에 추가된 필드라, 기존에 저장된 문서엔 없을 수 있음 —
+        // 그 경우 기본값(DEFAULT_HQ_BRANCHES)에서 실제 존재하는 지점명만 사용
+        var hqBranches = Array.isArray(d.hqBranches)
+          ? d.hqBranches.filter(function(n){ return branches.indexOf(n) !== -1; })
+          : DEFAULT_HQ_BRANCHES.filter(function(n){ return branches.indexOf(n) !== -1; });
         state.settings = {
           categories: (d.categories && d.categories.length) ? d.categories : DEFAULT_CATEGORIES.slice(),
           types: (d.types && d.types.length) ? d.types : DEFAULT_TYPES.slice(),
-          branches: (d.branches && d.branches.length) ? d.branches : DEFAULT_BRANCHES.slice()
+          branches: branches,
+          hqBranches: hqBranches
         };
       } else if(state.identity && state.identity.role === 'admin'){
         // seed once, from an admin session, so every viewer has a live doc to read
@@ -2033,6 +2053,7 @@
           categories: DEFAULT_CATEGORIES.slice(),
           types: DEFAULT_TYPES.slice(),
           branches: DEFAULT_BRANCHES.slice(),
+          hqBranches: DEFAULT_HQ_BRANCHES.slice(),
           updatedAt: nowIso(),
           updatedBy: memberActor()
         }).catch(function(err){ console.error('settings seed failed', err); });
@@ -2053,10 +2074,15 @@
   }
 
   function updateSettings(patch){
+    var branches = patch.branches || state.settings.branches;
+    var hqBranches = (patch.hqBranches || state.settings.hqBranches).filter(function(n){
+      return branches.indexOf(n) !== -1; // 삭제된 지점은 본사 목록에서도 자동으로 정리
+    });
     var merged = {
       categories: patch.categories || state.settings.categories,
       types: patch.types || state.settings.types,
-      branches: patch.branches || state.settings.branches,
+      branches: branches,
+      hqBranches: hqBranches,
       updatedAt: nowIso(),
       updatedBy: state.identity ? memberActor() : 'system'
     };
@@ -2066,7 +2092,7 @@
         notify('설정 저장에 실패했습니다.');
       });
     } else {
-      state.settings = { categories: merged.categories, types: merged.types, branches: merged.branches };
+      state.settings = { categories: merged.categories, types: merged.types, branches: merged.branches, hqBranches: merged.hqBranches };
       onSettingsChanged();
     }
   }
@@ -2075,7 +2101,7 @@
     if(!state.identity || state.identity.role !== 'admin') return;
     renderRuleList('categories', '분류');
     renderRuleList('types', '접수 유형');
-    renderRuleList('branches', '지점');
+    renderBranchLists();
 
     $all('.rule-add').forEach(function(form){
       form.onsubmit = function(e){
@@ -2112,6 +2138,53 @@
         removeRuleItem(kind, btn.getAttribute('data-value'), label);
       });
     });
+  }
+
+  function branchTagHtml(name, isHq){
+    var moveLabel = isHq ? '지점으로' : '본사로';
+    return '<span class="rule-tag">'+esc(name)+
+      '<button type="button" class="btn-move" data-move-branch="'+esc(name)+'">'+moveLabel+'</button>' +
+      '<button type="button" data-remove="branches" data-value="'+esc(name)+'" aria-label="삭제">' +
+      '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>' +
+      '</button></span>';
+  }
+
+  /* 지점 목록을 "지점"/"본사" 두 그룹으로 나눠 렌더링.
+     그룹 구분은 state.settings.hqBranches(본사로 지정된 이름 목록)로만 판단하며,
+     실제 branches 배열 자체는 하나로 유지 — 로그인/필터 등 기존 기능은 그대로 동작 */
+  function renderBranchLists(){
+    var branchList = $('#rule-list-branches');
+    var hqList = $('#rule-list-branches-hq');
+    if(!branchList || !hqList) return;
+    var hqSet = {};
+    (state.settings.hqBranches || []).forEach(function(n){ hqSet[n] = true; });
+    var branchItems = state.settings.branches.filter(function(n){ return !hqSet[n]; });
+    var hqItems = state.settings.branches.filter(function(n){ return hqSet[n]; });
+
+    branchList.innerHTML = branchItems.length
+      ? branchItems.map(function(n){ return branchTagHtml(n, false); }).join('')
+      : '<div class="empty-members" style="padding:16px 0;">등록된 지점이 없습니다.</div>';
+    hqList.innerHTML = hqItems.length
+      ? hqItems.map(function(n){ return branchTagHtml(n, true); }).join('')
+      : '<div class="empty-members" style="padding:16px 0;">본사로 이동된 지점이 없습니다.</div>';
+
+    $all('[data-remove="branches"]', branchList).concat($all('[data-remove="branches"]', hqList)).forEach(function(btn){
+      btn.addEventListener('click', function(){
+        removeRuleItem('branches', btn.getAttribute('data-value'), '지점');
+      });
+    });
+    $all('[data-move-branch]', branchList).concat($all('[data-move-branch]', hqList)).forEach(function(btn){
+      btn.addEventListener('click', function(){
+        toggleBranchGroup(btn.getAttribute('data-move-branch'));
+      });
+    });
+  }
+
+  function toggleBranchGroup(name){
+    var current = state.settings.hqBranches || [];
+    var isHq = current.indexOf(name) !== -1;
+    var next = isHq ? current.filter(function(n){ return n !== name; }) : current.concat([name]);
+    updateSettings({ hqBranches: next });
   }
 
   function removeRuleItem(kind, value, label){
@@ -2826,6 +2899,7 @@
   function goToBranchList(branch){
     state.listBranchFilter = branch;
     state.listDelayFilter = false;
+    if($('#flt-branch')) $('#flt-branch').value = branch;
     state.listPage = 1;
     setActiveTab('list');
   }
@@ -2839,6 +2913,7 @@
     if($('#flt-status')) $('#flt-status').value = status;
     if($('#flt-category')) $('#flt-category').value = '';
     if($('#flt-type')) $('#flt-type').value = '';
+    if($('#flt-branch')) $('#flt-branch').value = '';
     state.listPage = 1;
     setActiveTab('list');
   }
@@ -2852,6 +2927,7 @@
     if($('#flt-status')) $('#flt-status').value = '';
     if($('#flt-category')) $('#flt-category').value = '';
     if($('#flt-type')) $('#flt-type').value = '';
+    if($('#flt-branch')) $('#flt-branch').value = '';
     state.listPage = 1;
     setActiveTab('list');
   }
@@ -2905,6 +2981,13 @@
       return '<option value="'+esc(t)+'">'+esc(t)+'</option>';
     }).join('');
     if(state.settings.types.indexOf(prevType) !== -1) typeSel.value = prevType;
+
+    var branchSel = $('#flt-branch');
+    var prevBranch = branchSel.value;
+    branchSel.innerHTML = '<option value="">전체 지점</option>' + getSortedBranches().map(function(b){
+      return '<option value="'+esc(b)+'">'+esc(b)+'</option>';
+    }).join('');
+    if(prevBranch) branchSel.value = prevBranch;
   }
 
   function initListFilters(){
@@ -2912,6 +2995,11 @@
     ['flt-keyword','flt-status','flt-category','flt-type'].forEach(function(id){
       $('#'+id).addEventListener('input', function(){ state.listPage = 1; renderList(); });
       $('#'+id).addEventListener('change', function(){ state.listPage = 1; renderList(); });
+    });
+    $('#flt-branch').addEventListener('change', function(){
+      state.listBranchFilter = $('#flt-branch').value || null;
+      state.listPage = 1;
+      renderList();
     });
     $('#chk-select-all').addEventListener('change', function(){
       var checked = $('#chk-select-all').checked;
@@ -2924,6 +3012,7 @@
     $('#btn-clear-branch-filter').addEventListener('click', function(){
       state.listBranchFilter = null;
       state.listDelayFilter = false;
+      if($('#flt-branch')) $('#flt-branch').value = '';
       state.listPage = 1;
       renderList();
     });
