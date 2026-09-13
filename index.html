@@ -472,6 +472,7 @@
     color:var(--ink-2);
   }
   .chip.selected{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+  .chip-eq{ min-width:64px; text-align:center; }
   textarea{
     width:100%; min-height:110px; resize:vertical;
     padding:10px 12px; border:1px solid var(--border-strong); border-radius:9px;
@@ -1223,9 +1224,10 @@
           <div style="padding:16px 16px 4px;">
             <h3 style="font-size:13.5px;">지점</h3>
             <p class="chart-sub" style="margin-bottom:8px;">로그인 시 선택하는 지점 목록입니다. 목록에 없어도 직접 입력할 수 있습니다.</p>
+            <div style="font-size:11.5px;color:var(--ink-2);margin-bottom:6px;">지점 &gt; 구분</div>
             <div class="chip-group" id="branch-tab-chip">
-              <button type="button" class="chip selected" data-branch-tab="branch">지점</button>
-              <button type="button" class="chip" data-branch-tab="hq">본사</button>
+              <button type="button" class="chip chip-eq selected" data-branch-tab="branch">지점</button>
+              <button type="button" class="chip chip-eq" data-branch-tab="hq">본사</button>
             </div>
           </div>
           <div class="rule-list scroll" id="rule-list-branches"></div>
@@ -2178,7 +2180,9 @@
   /* 지점 목록을 "지점"/"본사" 탭으로 나눠 렌더링 — 한 번에 한 탭만 표시.
      그룹 구분은 state.settings.hqBranches(본사로 지정된 이름 목록)로만 판단하며,
      실제 branches 배열 자체는 하나로 유지 — 로그인/필터 등 기존 기능은 그대로 동작.
-     이동은 개별 버튼이 아니라: 체크박스로 여러 개 선택 → "선택 항목 OO로 이동" 버튼 */
+     이동은 개별 버튼이 아니라: 체크박스로 여러 개 선택 → "선택 항목 OO로 이동" 버튼.
+     접수 데이터에는 있지만(예: 경리팀) 아직 지점 목록에 정식 등록되지 않은 이름도
+     함께 보여줘서, 체크 후 이동하면 그 즉시 정식 목록에도 추가되도록 함. */
   function renderBranchLists(){
     var list = $('#rule-list-branches');
     var tabWrap = $('#branch-tab-chip');
@@ -2187,9 +2191,18 @@
     var tab = state.branchRuleTab || 'branch';
     var hqSet = {};
     (state.settings.hqBranches || []).forEach(function(n){ hqSet[n] = true; });
-    var items = state.settings.branches.filter(function(n){
-      return tab === 'hq' ? !!hqSet[n] : !hqSet[n];
+
+    var knownSet = {};
+    (state.settings.branches || []).forEach(function(n){ knownSet[n] = true; });
+    var unregistered = {};
+    (state.tickets || []).forEach(function(t){
+      if(t.branch && !knownSet[t.branch]) unregistered[t.branch] = true;
     });
+    var allNames = (state.settings.branches || []).concat(Object.keys(unregistered));
+
+    var items = allNames.filter(function(n){
+      return tab === 'hq' ? !!hqSet[n] : !hqSet[n];
+    }).sort(function(a,b){ return a.localeCompare(b, 'ko'); });
 
     $all('.chip', tabWrap).forEach(function(chip){
       chip.classList.toggle('selected', chip.getAttribute('data-branch-tab') === tab);
@@ -2198,12 +2211,17 @@
     list.innerHTML = items.length
       ? items.map(function(n){
           var checked = state.branchRuleSelected[n] ? ' checked' : '';
-          return '<span class="rule-tag">' +
-            '<input type="checkbox" class="branch-move-check" data-branch="'+esc(n)+'"'+checked+'>' +
-            esc(n) +
+          var isNew = !knownSet[n];
+          var removeBtn = isNew ? '' :
             '<button type="button" data-remove="branches" data-value="'+esc(n)+'" aria-label="삭제">' +
             '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>' +
-            '</button></span>';
+            '</button>';
+          var badge = isNew ? ' <span style="opacity:.6;font-weight:400;" title="접수 데이터에는 있지만 지점 목록에 등록되지 않음 — 이동하면 등록됩니다">(신규)</span>' : '';
+          return '<span class="rule-tag">' +
+            '<input type="checkbox" class="branch-move-check" data-branch="'+esc(n)+'"'+checked+'>' +
+            esc(n) + badge +
+            removeBtn +
+            '</span>';
         }).join('')
       : '<div class="empty-members" style="padding:16px 0;">등록된 '+(tab==='hq'?'본사':'지점')+'이(가) 없습니다.</div>';
 
@@ -2262,8 +2280,13 @@
           var selSet = {}; selected.forEach(function(n){ selSet[n] = true; });
           nextHq = current.filter(function(n){ return !selSet[n]; });
         }
+        // 접수 데이터에만 있던(목록 미등록) 지점명을 선택해 이동한 경우,
+        // 이동과 동시에 정식 지점 목록(branches)에도 추가
+        var currentBranches = state.settings.branches || [];
+        var branchSet = {}; currentBranches.forEach(function(n){ branchSet[n] = true; });
+        var newBranches = currentBranches.concat(selected.filter(function(n){ return !branchSet[n]; }));
         state.branchRuleSelected = {};
-        updateSettings({ hqBranches: nextHq });
+        updateSettings({ branches: newBranches, hqBranches: nextHq });
       });
     }
   }
