@@ -849,7 +849,14 @@
 
       <form id="login-form" novalidate>
         <div class="field">
-          <label for="in-branch">지점 선택 <span class="req">*</span></label>
+          <label>구분 <span class="req">*</span></label>
+          <div class="chip-group" id="branch-group-chip">
+            <button type="button" class="chip selected" data-branch-group="branch">지점</button>
+            <button type="button" class="chip" data-branch-group="hq">본사</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="in-branch" id="in-branch-label">지점 선택 <span class="req">*</span></label>
           <div class="combo">
             <input id="in-branch" name="branch" type="text" placeholder="지점명 또는 초성 검색 (예: ㄱㄴㅇㅇ)" autocomplete="off" required>
             <div class="combo-panel" id="branch-panel" hidden></div>
@@ -1617,19 +1624,47 @@
     return false;
   }
 
-  function getSortedBranches(){
-    return state.settings.branches.slice().sort(function(a,b){ return a.localeCompare(b,'ko'); });
+  /* group: 'branch'(지점) | 'hq'(본사) | 생략하면 전체 — 구분은 settings.hqBranches 기준 */
+  function getSortedBranches(group){
+    var hqSet = {};
+    (state.settings.hqBranches || []).forEach(function(n){ hqSet[n] = true; });
+    var list = state.settings.branches.filter(function(n){
+      if(group === 'hq') return !!hqSet[n];
+      if(group === 'branch') return !hqSet[n];
+      return true;
+    });
+    return list.slice().sort(function(a,b){ return a.localeCompare(b,'ko'); });
   }
 
   function initBranchCombo(){
     var input = $('#in-branch');
     var panel = $('#branch-panel');
+    var groupChipWrap = $('#branch-group-chip');
+    var groupChips = groupChipWrap ? $all('.chip', groupChipWrap) : [];
+    var group = 'branch'; // 로그인 화면의 1차 구분 — 지점(branch) / 본사(hq)
     var filtered = [];
     var highlight = -1;
 
+    function groupLabel(){ return group === 'hq' ? '본사' : '지점'; }
+    function updateBranchFieldText(){
+      var label = $('#in-branch-label');
+      if(label) label.innerHTML = groupLabel() + ' 선택 <span class="req">*</span>';
+      input.placeholder = groupLabel() + '명 또는 초성 검색 (예: ㄱㄴㅇㅇ)';
+    }
+    groupChips.forEach(function(chip){
+      chip.addEventListener('click', function(){
+        group = chip.getAttribute('data-branch-group');
+        groupChips.forEach(function(c){ c.classList.toggle('selected', c === chip); });
+        input.value = '';
+        updateBranchFieldText();
+        closePanel();
+      });
+    });
+    updateBranchFieldText();
+
     function renderPanel(){
       if(!filtered.length){
-        panel.innerHTML = '<div class="combo-empty">일치하는 지점이 없습니다</div>';
+        panel.innerHTML = '<div class="combo-empty">일치하는 '+esc(groupLabel())+'가 없습니다</div>';
         return;
       }
       panel.innerHTML = filtered.map(function(b, i){
@@ -1648,7 +1683,7 @@
     }
     function filterAndOpen(){
       var q = input.value.trim();
-      filtered = getSortedBranches().filter(function(b){ return branchMatches(b, q); });
+      filtered = getSortedBranches(group).filter(function(b){ return branchMatches(b, q); });
       highlight = filtered.length ? 0 : -1;
       renderPanel();
       panel.hidden = false;
