@@ -294,6 +294,7 @@
   #rule-list-branches{ justify-content:flex-start; }
   #rule-list-branches .rule-tag{ width:186px; box-sizing:border-box; justify-content:flex-start; }
   #rule-list-branches .rule-tag-label{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; }
+  #rule-list-branches .rule-tag-count{ flex:none; font-size:11px; font-weight:700; color:var(--ink-muted); }
   .rule-add{ display:flex; gap:8px; padding:0 16px 16px; }
   .rule-add input{
     flex:1; min-width:0; padding:8px 10px; border:1px solid var(--border-strong);
@@ -1123,6 +1124,8 @@
       <div class="list-toolbar" id="list-toolbar">
         <label class="checkbox-label"><input type="checkbox" id="chk-select-all"> 전체 선택</label>
         <span class="list-selected-count" id="list-selected-count"></span>
+        <select class="branch-select" id="bulk-branch-select" hidden></select>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-bulk-branch-change" style="width:auto;" hidden>지점 일괄 변경</button>
         <button type="button" class="btn btn-ghost btn-sm" id="btn-delete-selected" style="width:auto;color:var(--critical);border-color:var(--critical-soft);" hidden>선택 삭제</button>
       </div>
 
@@ -1528,6 +1531,7 @@
     branchRuleTab: 'branch',      // 기준관리 지점 카드의 현재 탭 (branch | hq)
     branchRuleSelected: {},        // 기준관리 지점 카드에서 이동 대상으로 체크된 이름들
     settingsUnsub: null,
+    settingsLoaded: false,
     ticketsUnsub: null,
     ticketsLoaded: false,
     ticketsError: null,
@@ -2030,6 +2034,7 @@
         state.tickets = docs;
         state.ordered = docs.slice().sort(function(a,b){ return (a.createdAt||'').localeCompare(b.createdAt||''); });
         renderAll();
+        reconcileUnregisteredBranches();
       }catch(ex){
         console.error('tickets onSnapshot handler crashed', ex);
         state.ticketsError = '접수 목록 처리 중 오류가 발생했습니다.';
@@ -2109,6 +2114,7 @@
           updatedBy: memberActor()
         }).catch(function(err){ console.error('settings seed failed', err); });
       }
+      state.settingsLoaded = true;
       onSettingsChanged();
     }, function(err){
       console.error('settings onSnapshot error', err);
@@ -2122,6 +2128,32 @@
     if($('#flt-category')) renderListFilterOptions();
     if(state.activeTab === 'rules') renderRulesView();
     if(state.activeTab === 'dashboard'){ renderTypeChart(); renderCategoryChart(); }
+    reconcileUnregisteredBranches();
+  }
+
+  /* 접수 데이터에는 있지만 지점 목록(기준관리 > 구분)에는 등록되지 않은 지점명을
+     자동으로 목록에 추가 — 예전엔 "신규" 배지만 뜨고 관리자가 체크박스로 직접
+     이동시켜야 정식 등록됐는데, 그 사이엔 삭제 버튼도 없어 목록이 들쭉날쭉해 보였음.
+     전체관리자 세션에서 데이터가 들어올 때마다(접수 목록/설정 갱신 시) 조용히
+     한 번 맞춰준다 — "지점" 그룹으로 추가되며, 본사로 옮기는 건 기존 이동 기능으로. */
+  function reconcileUnregisteredBranches(){
+    if(!state.settingsLoaded || !state.ticketsLoaded) return;
+    if(!state.identity || state.identity.role !== 'admin') return;
+    if(state.__branchReconcileInFlight) return;
+
+    var known = {};
+    (state.settings.branches || []).forEach(function(n){ known[n] = true; });
+    var missing = [];
+    var seen = {};
+    (state.tickets || []).forEach(function(t){
+      if(t.branch && !known[t.branch] && !seen[t.branch]){ seen[t.branch] = true; missing.push(t.branch); }
+    });
+    if(!missing.length) return;
+
+    state.__branchReconcileInFlight = true;
+    updateSettings({ branches: state.settings.branches.concat(missing) }).then(function(){
+      state.__branchReconcileInFlight = false;
+    });
   }
 
   function updateSettings(patch){
@@ -2138,13 +2170,14 @@
       updatedBy: state.identity ? memberActor() : 'system'
     };
     if(state.db){
-      state.db.doc('config/lists').set(merged).catch(function(err){
+      return state.db.doc('config/lists').set(merged).catch(function(err){
         console.error('settings save failed', err);
         notify('설정 저장에 실패했습니다.');
       });
     } else {
       state.settings = { categories: merged.categories, types: merged.types, branches: merged.branches, hqBranches: merged.hqBranches };
       onSettingsChanged();
+      return Promise.resolve();
     }
   }
 
@@ -2223,6 +2256,12 @@
     var NEW_BADGE_WINDOW_MS = 14 * 24 * 60 * 60 * 1000; // 2주
     var allNames = (state.settings.branches || []).concat(Object.keys(unregistered));
 
+    var countByBranch = {};
+    (state.tickets || []).forEach(function(t){
+      if(!t.branch) return;
+      countByBranch[t.branch] = (countByBranch[t.branch] || 0) + 1;
+    });
+
     var items = allNames.filter(function(n){
       return tab === 'hq' ? !!hqSet[n] : !hqSet[n];
     }).sort(function(a,b){ return a.localeCompare(b, 'ko'); });
@@ -2241,9 +2280,11 @@
             '</button>';
           var showNewBadge = isNew && firstSeenAt[n] && (Date.now() - firstSeenAt[n] < NEW_BADGE_WINDOW_MS);
           var badge = showNewBadge ? '<span style="opacity:.6;font-weight:400;flex:none;" title="접수 데이터에는 있지만 지점 목록에 등록되지 않음 — 이동하면 등록됩니다 (최초 등장 후 2주 동안만 표시)">신규</span>' : '';
+          var count = countByBranch[n] || 0;
           return '<span class="rule-tag">' +
             '<input type="checkbox" class="branch-move-check" data-branch="'+esc(n)+'"'+checked+'>' +
             '<span class="rule-tag-label" title="'+esc(n)+'">'+esc(n)+'</span>' +
+            '<span class="rule-tag-count">'+count+'건</span>' +
             badge +
             removeBtn +
             '</span>';
@@ -3161,6 +3202,14 @@
       return '<option value="'+esc(b)+'">'+esc(b)+'</option>';
     }).join('');
     branchSel.value = (prevBranch && groupBranches.indexOf(prevBranch) !== -1) ? prevBranch : '';
+
+    // 선택 항목 지점 일괄 변경용 select — 전체 지점(지점+본사) 목록
+    var bulkBranchSel = $('#bulk-branch-select');
+    if(bulkBranchSel){
+      var prevBulk = bulkBranchSel.value;
+      var allBranches = getSortedBranches();
+      bulkBranchSel.innerHTML = branchOptionsHtml(allBranches.indexOf(prevBulk) !== -1 ? prevBulk : null);
+    }
   }
 
   function initListFilters(){
@@ -3191,6 +3240,7 @@
       renderList();
     });
     $('#btn-delete-selected').addEventListener('click', deleteSelectedTickets);
+    $('#btn-bulk-branch-change').addEventListener('click', bulkChangeBranch);
     $('#btn-clear-branch-filter').addEventListener('click', function(){
       state.listBranchFilter = null;
       state.listDelayFilter = false;
@@ -3210,12 +3260,18 @@
     var count = selectedTicketCount();
     var countEl = $('#list-selected-count');
     var delBtn = $('#btn-delete-selected');
+    var bulkSel = $('#bulk-branch-select');
+    var bulkBtn = $('#btn-bulk-branch-change');
     if(count > 0){
       countEl.textContent = count + '건 선택됨';
       delBtn.hidden = false;
+      if(bulkSel) bulkSel.hidden = false;
+      if(bulkBtn) bulkBtn.hidden = false;
     } else {
       countEl.textContent = '';
       delBtn.hidden = true;
+      if(bulkSel) bulkSel.hidden = true;
+      if(bulkBtn) bulkBtn.hidden = true;
     }
     var pageIds = state.__currentPageTicketIds || [];
     $('#chk-select-all').checked = pageIds.length > 0 && pageIds.every(function(id){ return !!state.selectedTicketIds[id]; });
@@ -3242,6 +3298,35 @@
         state.selectedTicketIds = {};
         btn.disabled = false;
         notify(ids.length + '건이 삭제되었습니다.');
+        renderAll();
+      });
+    });
+  }
+
+  function bulkChangeBranch(){
+    var ids = Object.keys(state.selectedTicketIds);
+    if(!ids.length) return;
+    var branch = $('#bulk-branch-select').value;
+    if(!branch) return;
+    showConfirm(ids.length + '건의 지점을 "' + branch + '"(으)로 변경하시겠습니까?', function(){
+      var btn = $('#btn-bulk-branch-change');
+      btn.disabled = true;
+      var db = state.db;
+      var patch = { branch: branch, updatedAt: nowIso() };
+      var updates = ids.map(function(id){
+        if(!db) return Promise.resolve();
+        return db.collection('tickets').doc(id).update(patch).catch(function(err){
+          console.error('bulk branch change failed for ' + id, err);
+        });
+      });
+      Promise.all(updates).then(function(){
+        var changedSet = {};
+        ids.forEach(function(id){ changedSet[id] = true; });
+        state.tickets = state.tickets.map(function(t){ return changedSet[t.id] ? Object.assign({}, t, patch) : t; });
+        state.ordered = state.ordered.map(function(t){ return changedSet[t.id] ? Object.assign({}, t, patch) : t; });
+        state.selectedTicketIds = {};
+        btn.disabled = false;
+        notify(ids.length + '건의 지점이 변경되었습니다.');
         renderAll();
       });
     });
@@ -3481,7 +3566,7 @@
           '<div style="margin-top:6px;display:flex;align-items:center;gap:6px;">' +
             '<label style="font-size:11px;color:var(--ink-muted);">지점</label>' +
             '<select class="branch-select" id="branch-select-pending-'+esc(m.id)+'">' +
-              memberBranchOptionsHtml(m.branch) +
+              branchOptionsHtml(m.branch) +
             '</select>' +
           '</div></div>' +
           '<div class="actions">' +
@@ -3521,7 +3606,7 @@
           '<div style="margin-top:6px;display:flex;align-items:center;gap:6px;">' +
             '<label style="font-size:11px;color:var(--ink-muted);">지점</label>' +
             '<select class="branch-select" data-branchchange="'+esc(m.id)+'">' +
-              memberBranchOptionsHtml(m.branch) +
+              branchOptionsHtml(m.branch) +
             '</select>' +
           '</div></div>' +
           '<div class="actions">'+actions+'</div>' +
@@ -3592,10 +3677,10 @@
     });
   }
 
-  /* 회원관리에서 지점을 고를 때 쓰는 select 옵션 — 등록된 전체 지점 목록(지점+본사)에서
-     고르되, 그 회원의 현재 지점이 목록에 없는 값이어도(오래된 값 등) 사라지지 않도록
-     맨 앞에 끼워 넣음 */
-  function memberBranchOptionsHtml(current){
+  /* 지점을 고를 때 쓰는 select 옵션(회원관리·접수목록 공용) — 등록된 전체 지점 목록
+     (지점+본사)에서 고르되, 현재 값이 목록에 없는 값이어도(오래된 값 등) 사라지지
+     않도록 맨 앞에 끼워 넣음 */
+  function branchOptionsHtml(current){
     var list = getSortedBranches();
     if(current && list.indexOf(current) === -1) list = [current].concat(list);
     return list.map(function(b){
