@@ -1065,8 +1065,8 @@
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7"></path><path d="M17 8l-5-5-5 5"></path><path d="M12 3v13"></path></svg>
                   파일 추가
                 </button>
-                <input type="file" id="f-attach-input" accept="image/png,image/jpeg,image/gif,image/webp,application/pdf" multiple hidden>
-                <span class="field-hint" id="attach-hint" style="margin-top:0;">이미지는 자동으로 리사이징되어 업로드됩니다 · PDF는 10MB까지</span>
+                <input type="file" id="f-attach-input" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden>
+                <span class="field-hint" id="attach-hint" style="margin-top:0;">이미지 파일만 첨부할 수 있으며, 자동으로 리사이징되어 업로드됩니다</span>
               </div>
               <div class="attach-list" id="attach-list"></div>
             </div>
@@ -1495,9 +1495,7 @@
   var MAX_ATTACHMENTS = 5;
   var IMAGE_MAX_DIM = 1600;
   var IMAGE_JPEG_QUALITY = 0.82;
-  var DOC_MAX_BYTES = 10 * 1024 * 1024; // 10MB — PDF/문서 첨부 용량 상한
   var IMAGE_MIME = { "image/png":1, "image/jpeg":1, "image/gif":1, "image/webp":1 };
-  var DOC_MIME = { "application/pdf":1 };
 
   /* ================================================================ */
   /* STATE                                                              */
@@ -2511,18 +2509,13 @@
 
   function processAttachFile(file){
     var isImage = !!IMAGE_MIME[file.type];
-    var isDoc = !!DOC_MIME[file.type];
-    if(!isImage && !isDoc){
-      notify(file.name + ': 이미지(JPG/PNG/GIF/WEBP) 또는 PDF 파일만 첨부할 수 있습니다.');
-      return;
-    }
-    if(isDoc && file.size > DOC_MAX_BYTES){
-      notify(file.name + ': 문서 파일은 최대 ' + fmtBytes(DOC_MAX_BYTES) + '까지 첨부할 수 있습니다.');
+    if(!isImage){
+      notify(file.name + ': 이미지(JPG/PNG/GIF/WEBP) 파일만 첨부할 수 있습니다.');
       return;
     }
 
     var entry = {
-      seq: ++attachSeq, name: file.name, kind: isImage ? 'image' : 'document',
+      seq: ++attachSeq, name: file.name, kind: 'image',
       status: 'uploading', originalSize: file.size, sizeBytes: 0,
       id: null, url: null, contentType: null, previewUrl: null
     };
@@ -2530,15 +2523,11 @@
     renderAttachList();
 
     function runUpload(){
-      var pipeline = isImage ? resizeImageToBlob(file) : Promise.resolve(file);
-      pipeline.then(function(blob){
+      resizeImageToBlob(file).then(function(blob){
         if(state.attachments.indexOf(entry) === -1) return Promise.reject({ code: 'removed' });
-        if(isImage){
-          entry.previewUrl = URL.createObjectURL(blob);
-          renderAttachList();
-        }
-        var uploadType = isImage ? 'image/jpeg' : 'application/pdf';
-        return state.assets.upload(blob, { type: uploadType });
+        entry.previewUrl = URL.createObjectURL(blob);
+        renderAttachList();
+        return state.assets.upload(blob, { type: 'image/jpeg' });
       }).then(function(res){
         if(state.attachments.indexOf(entry) === -1) return;
         entry.status = 'done';
