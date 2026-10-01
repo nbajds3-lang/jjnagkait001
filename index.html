@@ -291,8 +291,8 @@
   }
   .rule-tag button:hover{ background:var(--critical-soft); color:var(--critical); }
   .rule-tag .branch-move-check{ margin:0 1px 0 0; width:13px; height:13px; flex:none; }
-  #rule-list-branches{ justify-content:flex-start; }
-  #rule-list-branches .rule-tag{ width:186px; box-sizing:border-box; justify-content:flex-start; }
+  #rule-list-branches{ display:grid; grid-template-columns:1fr 1fr; justify-content:stretch; }
+  #rule-list-branches .rule-tag{ width:100%; box-sizing:border-box; justify-content:flex-start; }
   #rule-list-branches .rule-tag-label{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; }
   #rule-list-branches .rule-tag-count{ flex:none; font-size:11px; font-weight:700; color:var(--ink-muted); }
   .rule-add{ display:flex; gap:8px; padding:0 16px 16px; }
