@@ -853,14 +853,14 @@
   .imp-msg.ok{ color:var(--good); font-weight:700; }
 
   /* ---- 권한 레벨 아이콘 (0 전체관리자 / 1 운영관리자 / 2 사용자) ---- */
-  .lv{ display:inline-flex; align-items:center; gap:2px; height:15px; padding:0 5px 0 4px; border-radius:999px;
+  .lv{ display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; padding:0; border-radius:50%;
     font-size:9.5px; font-weight:800; line-height:1; color:#fff; vertical-align:middle; margin-left:5px; letter-spacing:0; flex:none; text-transform:none; }
-  .lv svg{ width:9px; height:9px; stroke:none; fill:currentColor; }
+  .lv svg{ width:10px; height:10px; stroke:none; fill:currentColor; }
   .lv0{ background:#d92d20; }
   .lv1{ background:#c2410c; }
   .lv2{ background:#087443; }
-  nav.tabs button .lv{ position:absolute; top:0; left:calc(50% + 6px); margin:0; height:13px; padding:0 3px 0 2px; font-size:8.5px; }
-  nav.tabs button .lv svg{ width:8px; height:8px; }
+  nav.tabs button .lv{ position:absolute; top:0; left:calc(50% + 7px); margin:0; width:14px; height:14px; }
+  nav.tabs button .lv svg{ width:9px; height:9px; }
   nav.tabs button[data-tab="members"] .lv{ left:auto; right:calc(50% + 6px); }
   .lv-legend{ width:100%; box-sizing:border-box; display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; max-width:1180px; margin:0 auto; padding:8px 16px 0;
     font-size:11.5px; color:var(--ink-muted); }
@@ -4531,7 +4531,7 @@
   };
   function lvHtml(n){
     var m = LV_META[n];
-    return '<i class="lv lv'+n+'" title="Lv.'+n+' '+m.name+'" aria-label="Lv.'+n+' '+m.name+'">'+m.svg+n+'</i>';
+    return '<i class="lv lv'+n+'" data-lv="'+n+'" title="'+m.name+'" aria-label="'+m.name+'">'+m.svg+'</i>';
   }
   function applyLevelIcons(){
     var add = function(el, n, after){
