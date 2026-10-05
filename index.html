@@ -828,6 +828,29 @@
     }
     .kv-grid{ grid-template-columns:1fr 1fr; }
   }
+
+  /* ---------------------------------------------------------------- */
+  /* Ticket import (엑셀/CSV 업로드)                                     */
+  /* ---------------------------------------------------------------- */
+  .imp-drop{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+  .imp-sheets{ display:flex; flex-wrap:wrap; gap:6px 14px; margin-bottom:12px; font-size:12.5px; }
+  .imp-sheets label{ display:inline-flex; align-items:center; gap:6px; color:var(--ink-2); cursor:pointer; }
+  .imp-stats{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:12px; }
+  .imp-stat .l{ line-height:1.35; }
+  .imp-stat{ background:var(--surface-2); border-radius:9px; padding:9px 12px; }
+  .imp-stat .n{ font-size:18px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .imp-stat .l{ font-size:11px; color:var(--ink-muted); margin-top:1px; }
+  .imp-stat.new .n{ color:var(--accent); }
+  .imp-note{ font-size:11.5px; color:var(--ink-muted); line-height:1.55; margin-bottom:12px; }
+  .imp-sample{ border:1px solid var(--border); border-radius:9px; overflow:hidden; margin-bottom:12px; }
+  .imp-sample div{ display:flex; gap:8px; padding:7px 10px; font-size:11.5px; border-top:1px solid var(--border); }
+  .imp-sample div:first-child{ border-top:none; }
+  .imp-sample .d{ flex:none; width:74px; color:var(--ink-muted); font-variant-numeric:tabular-nums; }
+  .imp-sample .b{ flex:none; width:96px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+  .imp-sample .c{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink-2); }
+  .imp-msg{ font-size:12.5px; margin-bottom:10px; }
+  .imp-msg.err{ color:var(--critical); }
+  .imp-msg.ok{ color:var(--good); font-weight:700; }
 </style>
 
 <!-- ==================================================================== -->
@@ -1095,6 +1118,9 @@
           <h1>접수 목록</h1>
           <p class="desc">전체 지점의 접수를 검색·필터링하고 처리 상태를 확인하세요.</p>
         </div>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-open-import" style="width:auto;" hidden>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7"></path><path d="M17 8l-5-5-5 5"></path><path d="M12 3v13"></path></svg>엑셀 업로드
+        </button>
       </div>
 
       <div class="card filters">
@@ -1359,6 +1385,43 @@
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" id="modal-cancel">닫기</button>
       <button class="btn btn-primary btn-sm" style="width:auto" id="modal-save">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================================================================== -->
+<!-- TICKET IMPORT MODAL (전체관리자 전용)                                  -->
+<!-- ==================================================================== -->
+<div class="modal-backdrop" id="import-backdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="import-title">
+    <div class="modal-head">
+      <div><h2 id="import-title">접수 엑셀/CSV 업로드</h2></div>
+      <button class="modal-close" id="import-close" aria-label="닫기" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <div class="imp-drop">
+      <input type="file" id="import-file" accept=".xlsx,.xls,.csv">
+      <p class="imp-note" style="margin:0;">기존 접수 엑셀 양식(지점 요청 · 본사 요청 · 가맹 요청 시트) 또는 같은 열 구성의 CSV를 올리면, 이미 등록된 건(지점 + 작성자 + 내용이 같은 건)은 새로 만들지 않고 새 건만 추가하며, 처리 상태·답변·분류 등이 엑셀에서 바뀐 기존 건은 업데이트할 수 있습니다. 먼저 미리보기를 보여드리며, 확인 버튼을 누르기 전에는 아무것도 저장되지 않습니다.</p>
+    </div>
+    <div id="import-msg" class="imp-msg" hidden></div>
+    <div id="import-sheets" class="imp-sheets" hidden></div>
+    <div id="import-result" hidden>
+      <div class="imp-stats">
+        <div class="imp-stat new"><div class="n" id="imp-n-new">0</div><div class="l">신규 추가 대상</div></div>
+        <div class="imp-stat new"><div class="n" id="imp-n-upd">0</div><div class="l">내용이 바뀐 기존 건 (업데이트 대상)</div></div>
+        <div class="imp-stat"><div class="n" id="imp-n-dup">0</div><div class="l">이미 등록됨, 변경 없음 (제외)</div></div>
+        <div class="imp-stat"><div class="n" id="imp-n-app">0</div><div class="l">앱에서 수정돼 건너뜀</div></div>
+        <div class="imp-stat"><div class="n" id="imp-n-filedup">0</div><div class="l">파일 내 중복 (제외)</div></div>
+        <div class="imp-stat"><div class="n" id="imp-n-skip">0</div><div class="l">기타 제외</div></div>
+      </div>
+      <div class="imp-sheets" id="imp-update-wrap" hidden><label><input type="checkbox" id="imp-do-update" checked>엑셀에서 바뀐 기존 건도 함께 업데이트</label></div>
+      <p class="imp-note" id="imp-skip-detail"></p>
+      <div class="imp-sample" id="imp-sample"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" id="import-cancel" type="button">닫기</button>
+      <button class="btn btn-primary btn-sm" style="width:auto" id="import-commit" type="button" disabled>추가하기</button>
     </div>
   </div>
 </div>
@@ -1923,6 +1986,7 @@
     var isAdmin = identity.role === 'admin';
     var canManageList = isAdmin || identity.role === 'manager';
     $all('[data-tab="members"]').forEach(function(b){ b.hidden = !isAdmin; });
+    var impBtn = $('#btn-open-import'); if(impBtn) impBtn.hidden = !isAdmin;
     $all('[data-tab="rules"]').forEach(function(b){ b.hidden = !isAdmin; });
     $all('[data-tab="list"]').forEach(function(b){ b.hidden = !canManageList; });
     $all('[data-tab="stats"]').forEach(function(b){ b.hidden = !canManageList; });
@@ -3936,6 +4000,463 @@
     }
   }
 
+
+  /* ================================================================ */
+  /* TICKET IMPORT (엑셀/CSV 업로드 → 중복 제외 후 추가, 전체관리자 전용)    */
+  /* ================================================================ */
+  var XLSX_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  var IMPORT_DEFAULT_SHEET = /(지점|본사|가맹)\s*요청/;
+  var imp = { file:null, buf:null, isCsv:false, sheetNames:[], selected:{}, cache:{}, plan:null, busy:false };
+  var xlsxLibPromise = null;
+  var impAdded = { extra:[], patched:{} };   // 이번 접속에서 방금 추가한 건 — 실시간 목록 반영이 늦어도 중복 추가되지 않게 함
+
+  function loadXlsxLib(){
+    if(window.XLSX) return Promise.resolve(window.XLSX);
+    if(xlsxLibPromise) return xlsxLibPromise;
+    xlsxLibPromise = new Promise(function(resolve, reject){
+      var sc = document.createElement('script');
+      sc.src = XLSX_CDN;
+      sc.onload = function(){ window.XLSX ? resolve(window.XLSX) : reject(new Error('xlsx_missing')); };
+      sc.onerror = function(){ xlsxLibPromise = null; reject(new Error('xlsx_load_failed')); };
+      document.head.appendChild(sc);
+    });
+    return xlsxLibPromise;
+  }
+
+  function impNorm(s){ return String(s == null ? '' : s).replace(/\s+/g, '').toLowerCase(); }
+  function impStripAcct(c){ return String(c == null ? '' : c).replace(/^\s*\[계정:[^\]]*\]\s*/, ''); }
+  function impKey(branch, requester, content){ return impNorm(branch) + '|' + impNorm(requester) + '|' + impNorm(impStripAcct(content)); }
+  function impTruthy(v){
+    if(v === true) return true;
+    if(v === false || v == null) return false;
+    return /^(true|y|yes|o|v|1|✓|완료)$/i.test(String(v).trim());
+  }
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  /* 날짜 → 'YYYY-MM-DDT09:00:00.000Z' (기존 이전 데이터와 같은 규칙). 해석 불가면 null */
+  function impDateIso(v){
+    var y, m, d;
+    if(v instanceof Date && !isNaN(v.getTime())){ y = v.getFullYear(); m = v.getMonth() + 1; d = v.getDate(); }
+    else if(typeof v === 'number' && isFinite(v) && v > 20000 && v < 80000){
+      var dt = new Date(Math.round((v - 25569) * 86400000));
+      y = dt.getUTCFullYear(); m = dt.getUTCMonth() + 1; d = dt.getUTCDate();
+    } else if(typeof v === 'string'){
+      var mt = v.trim().match(/^(\d{4})[-./\s]+(\d{1,2})[-./\s]+(\d{1,2})/);
+      if(!mt) return null;
+      y = +mt[1]; m = +mt[2]; d = +mt[3];
+    } else return null;
+    if(!(y >= 2000 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31)) return null;
+    return y + '-' + pad2(m) + '-' + pad2(d) + 'T09:00:00.000Z';
+  }
+
+  /* 시트(2차원 배열) → 접수 행 목록 + 제외 사유 집계. 양식을 못 찾으면 null */
+  function impExtract(aoa){
+    var hdrIdx = -1, i, j;
+    for(i = 0; i < Math.min(aoa.length, 10); i++){
+      var hn = (aoa[i] || []).map(function(c){ return impNorm(c); });
+      var hasContent = hn.some(function(c){ return c.indexOf('내용') !== -1; });
+      var hasBranch = hn.some(function(c){ return c.indexOf('지점') !== -1 || c.indexOf('부서') !== -1; });
+      if(hasContent && hasBranch){ hdrIdx = i; break; }
+    }
+    if(hdrIdx === -1) return null;
+    var col = {};
+    (aoa[hdrIdx] || []).forEach(function(c, idx){
+      var h = impNorm(c);
+      if(!h) return;
+      function set(k){ if(col[k] === undefined) col[k] = idx; }
+      if(h.indexOf('답변') !== -1) set('answer');
+      else if(h.indexOf('날짜') !== -1) set('date');
+      else if(h.indexOf('부서') !== -1 || h.indexOf('지점명') !== -1) set('branch');
+      else if(h.indexOf('작성자') !== -1) set('requester');
+      else if(h.indexOf('분류') !== -1) set('category');
+      else if(h.indexOf('메뉴') !== -1) set('menuPath');
+      else if(h.indexOf('계정') !== -1) set('account');
+      else if(h.indexOf('회원명') !== -1) set('memberName');
+      else if(h.indexOf('회원번호') !== -1) set('memberNumber');
+      else if(h.indexOf('내용') !== -1) set('content');
+      else if(h.indexOf('완료확인') !== -1) set('doneConfirm');
+      else if(h.indexOf('완료') === 0) set('done');
+    });
+    if(col.content === undefined || col.branch === undefined || col.date === undefined) return null;
+    function cell(r, k){ return col[k] === undefined ? '' : r[col[k]]; }
+    function txt(v){ return v == null ? '' : String(v).trim(); }
+    function dash(v){ var t = txt(v); return t === '-' ? '' : t; }
+    var out = { rows:[], skip:{ blank:0, example:0, nodate:0, badcol:0 }, fixedDate:0 };
+    var lastIso = null;
+    for(j = hdrIdx + 1; j < aoa.length; j++){
+      var r = aoa[j] || [];
+      var content = txt(cell(r, 'content'));
+      if(!content){ out.skip.blank++; continue; }
+      var rawDate = cell(r, 'date');
+      if(String(rawDate).trim() === '예시' || content.indexOf('▼ 이미지 첨부 방법') === 0){ out.skip.example++; continue; }
+      // 지점/작성자가 비어 있으면 기존 이전 데이터와 같은 규칙으로 '미지정'/'미상', 날짜가 비었거나 이상하면 직전 행의 날짜 사용
+      // 지점 칸에 날짜/숫자가 들어간 행(엑셀에서 열이 한 칸 어긋난 경우)은 가져오지 않고 알려줌 — 지점명으로 잘못 자동등록되는 것 방지
+      var rawBranch = cell(r, 'branch');
+      if(rawBranch instanceof Date || typeof rawBranch === 'number' || /^\d{4}[-./]\d{1,2}[-./]\d{1,2}/.test(txt(rawBranch))){ out.skip.badcol++; continue; }
+      var branch = txt(rawBranch) || '미지정';
+      var requester = txt(cell(r, 'requester')) || '미상';
+      var iso = impDateIso(rawDate);
+      if(!iso){
+        if(!lastIso){ out.skip.nodate++; continue; }
+        iso = lastIso; out.fixedDate++;
+      } else { lastIso = iso; }
+      var acct = dash(cell(r, 'account'));
+      var status = impTruthy(cell(r, 'doneConfirm')) ? '완료' : (impTruthy(cell(r, 'done')) ? '처리중' : '접수');
+      out.rows.push({
+        branch: branch,
+        requester: requester,
+        loose: (branch === '미지정' || requester === '미상'),
+        category: dash(cell(r, 'category')) || '기타',
+        menuPath: dash(cell(r, 'menuPath')),
+        memberName: dash(cell(r, 'memberName')),
+        memberNumber: dash(cell(r, 'memberNumber')),
+        content: acct ? ('[계정: ' + acct + ']\n' + content) : content,
+        answer: txt(cell(r, 'answer')),
+        status: status,
+        createdAt: iso
+      });
+    }
+    return out;
+  }
+
+  function impMsg(text, kind){
+    var el = $('#import-msg');
+    if(!text){ el.hidden = true; el.textContent = ''; return; }
+    el.hidden = false; el.textContent = text; el.className = 'imp-msg' + (kind ? ' ' + kind : '');
+  }
+
+  function impReset(){
+    imp.file = null; imp.buf = null; imp.isCsv = false; imp.sheetNames = []; imp.selected = {}; imp.cache = {}; imp.plan = null; imp.busy = false;
+    $('#import-file').value = '';
+    $('#import-sheets').hidden = true; $('#import-sheets').innerHTML = '';
+    $('#import-result').hidden = true;
+    $('#imp-update-wrap').hidden = true;
+    $('#import-commit').disabled = true;
+    $('#import-commit').textContent = '추가하기';
+    impMsg('');
+  }
+
+  function impDecodeCsv(buf){
+    try{ return new TextDecoder('utf-8', { fatal:true }).decode(buf).replace(/^﻿/, ''); }
+    catch(e){ return new TextDecoder('euc-kr').decode(buf); }
+  }
+
+  /* 선택된 시트만 파싱(캐시) */
+  function impSheetRows(XLSX, name){
+    if(imp.cache[name]) return imp.cache[name];
+    var wb;
+    if(imp.isCsv){
+      wb = XLSX.read(impDecodeCsv(imp.buf), { type:'string' });
+      name = wb.SheetNames[0];
+    } else {
+      wb = XLSX.read(imp.buf, { type:'array', sheets:[name] });
+    }
+    var ws = wb.Sheets[name];
+    var aoa = ws ? XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:'' }) : [];
+    imp.cache[name] = impExtract(aoa);
+    return imp.cache[name];
+  }
+
+  function impCatNorm(s){ return String(s == null ? '' : s).replace(/\s+/g, '').toLowerCase(); }
+  function impStr(v){ return v == null ? '' : String(v).trim(); }
+  /* 앱에서 이미 손댄 건(답변자 기록이 있거나 수정 이력이 있는 건)은 엑셀 값으로 덮어쓰지 않음 */
+  function impAppEdited(t){
+    return !!(impStr(t.answeredBy) || (t.updatedAt && t.createdAt && t.updatedAt !== t.createdAt));
+  }
+  /* 기존 접수(t)와 엑셀 행(row)을 비교해 바뀐 필드만 반환. 엑셀 칸이 비어 있으면 기존 값을 지우지 않음 */
+  function impDiff(t, row){
+    var f = {}, labels = [];
+    if(row.status && row.status !== t.status){ f.status = row.status; labels.push('상태 ' + (t.status || '-') + '→' + row.status); }
+    if(impStr(row.answer) && impStr(row.answer) !== impStr(t.answer)){ f.answer = impStr(row.answer); labels.push(impStr(t.answer) ? '답변 수정' : '답변 추가'); }
+    if(row.category && impCatNorm(row.category) !== impCatNorm(t.category)){ f.category = row.category; labels.push('분류 ' + (t.category || '-') + '→' + row.category); }
+    [['menuPath', '메뉴경로'], ['memberName', '회원명'], ['memberNumber', '회원번호']].forEach(function(p){
+      if(impStr(row[p[0]]) && impStr(row[p[0]]) !== impStr(t[p[0]])){ f[p[0]] = impStr(row[p[0]]); labels.push(p[1] + ' 변경'); }
+    });
+    return labels.length ? { fields:f, labels:labels } : null;
+  }
+
+  /* 시트 행들 + 현재 접수 목록 → 신규 / 업데이트 / 제외 계획 (화면과 무관한 순수 계산)
+     같은 지점·작성자·내용이 여러 번 올라오는 정상적인 재접수가 있어서, 단순 "있다/없다"가 아니라
+     엑셀 행과 기존 접수를 1:1로 짝지어(같은 날짜 우선) 짝이 없는 행만 신규로 봅니다.
+     날짜·회원까지 똑같은 행이 엑셀에 두 번 있으면 복사 실수로 보고 하나만 인정합니다. */
+  function impPlan(sheetResults, tickets, categories, branches){
+    var catMap = {}, branchMap = {}, docsByKey = {}, docsByContent = {};
+    (categories || []).forEach(function(c){ catMap[impCatNorm(c)] = c; });
+    (branches || []).forEach(function(b){ branchMap[impCatNorm(b)] = b; });
+    var live = {};
+    tickets.forEach(function(t){ if(t.importedAt) live[t.importedAt] = true; });
+    var pool = tickets.map(function(t){ return impAdded.patched[t.id] ? Object.assign({}, t, impAdded.patched[t.id]) : t; })
+      .concat(impAdded.extra.filter(function(x){ return !live[x.importedAt]; }));   // 방금 추가했지만 실시간 목록에 아직 안 보이는 건
+    pool.forEach(function(t){
+      var k = impKey(t.branch, t.requester, t.content), c = impNorm(impStripAcct(t.content));
+      (docsByKey[k] = docsByKey[k] || []).push(t);
+      (docsByContent[c] = docsByContent[c] || []).push(t);
+      var cn = impCatNorm(t.category);
+      if(cn && !catMap[cn]) catMap[cn] = t.category;
+    });
+    var stat = { total:0, same:0, filedup:0, appEdited:0, blank:0, example:0, nodate:0, badcol:0, fixedDate:0, unsupported:[] };
+    var rows = [];
+    sheetResults.forEach(function(sr){
+      var res = sr.res;
+      if(!res){ stat.unsupported.push(sr.name); return; }
+      stat.blank += res.skip.blank; stat.example += res.skip.example; stat.nodate += res.skip.nodate; stat.badcol += (res.skip.badcol || 0); stat.fixedDate += res.fixedDate;
+      res.rows.forEach(function(row){
+        stat.total++;
+        row.category = catMap[impCatNorm(row.category)] || row.category;
+        row.branch = branchMap[impCatNorm(row.branch)] || row.branch;   // 대소문자·띄어쓰기만 다른 지점명은 등록된 이름으로 통일
+        row.__sheet = sr.name;
+        rows.push(row);
+      });
+    });
+    // 1) 날짜·회원까지 똑같은 중복 행 제거
+    var sigSeen = {}, uniq = [];
+    rows.forEach(function(row){
+      var sig = impKey(row.branch, row.requester, row.content) + '|' + row.createdAt.slice(0, 10) + '|' + impNorm(row.memberName) + '|' + impNorm(row.memberNumber);
+      if(sigSeen[sig]){ stat.filedup++; return; }
+      sigSeen[sig] = true; uniq.push(row);
+    });
+    // 2) 기존 접수와 1:1 짝짓기 (같은 날짜 우선 → 남는 것은 순서대로)
+    var used = new Set(), matched = new Array(uniq.length);
+    function memSig(x){ return impNorm(x.memberName) + '|' + impNorm(x.memberNumber); }
+    // 우선순위: ① 같은 날짜+같은 회원 ② 같은 회원 ③ 같은 날짜 ④ 아무거나(순서대로)
+    var LEVELS = [
+      function(r, t){ return (t.createdAt || '').slice(0, 10) === r.createdAt.slice(0, 10) && memSig(t) === memSig(r); },
+      function(r, t){ return memSig(t) === memSig(r); },
+      function(r, t){ return (t.createdAt || '').slice(0, 10) === r.createdAt.slice(0, 10); },
+      function(){ return true; }
+    ];
+    function claim(list, idxs, level){
+      idxs.forEach(function(i){
+        if(matched[i]) return;
+        var row = uniq[i], pick = null, j;
+        for(j = 0; j < list.length; j++){
+          if(!used.has(list[j]) && LEVELS[level](row, list[j])){ pick = list[j]; break; }
+        }
+        if(pick){ used.add(pick); matched[i] = pick; }
+      });
+    }
+    var byKeyIdx = {}, byContentIdx = {};
+    uniq.forEach(function(row, i){
+      var k = impKey(row.branch, row.requester, row.content);
+      (byKeyIdx[k] = byKeyIdx[k] || []).push(i);
+      if(row.loose){ var c = impNorm(impStripAcct(row.content)); (byContentIdx[c] = byContentIdx[c] || []).push(i); }
+    });
+    [0, 1, 2, 3].forEach(function(level){
+      Object.keys(byKeyIdx).forEach(function(k){ if(docsByKey[k]) claim(docsByKey[k], byKeyIdx[k], level); });
+    });
+    [0, 1, 2, 3].forEach(function(level){   // 지점/작성자가 비어 있던 행은 내용만으로도 대조
+      Object.keys(byContentIdx).forEach(function(c){ if(docsByContent[c]) claim(docsByContent[c], byContentIdx[c], level); });
+    });
+    var news = [], updates = [];
+    uniq.forEach(function(row, i){
+      var t = matched[i];
+      if(!t){ news.push(row); return; }
+      var d = impDiff(t, row);
+      if(!d){ stat.same++; return; }
+      if(impAppEdited(t)){ stat.appEdited++; return; }
+      updates.push({ id:t.id, ticket:t, changes:d.fields, labels:d.labels, row:row });
+    });
+    return { news:news, updates:updates, stat:stat };
+  }
+
+  function impAnalyze(){
+    var XLSX = window.XLSX;
+    var results = [];
+    imp.sheetNames.forEach(function(name){
+      if(!imp.selected[name]) return;
+      results.push({ name:name, res:impSheetRows(XLSX, name) });
+    });
+    var st = state.settings || {};
+    var plan = impPlan(results, state.tickets, st.categories, (st.branches || []).concat(st.hqBranches || []));
+    imp.plan = plan;
+    var news = plan.news, updates = plan.updates, stat = plan.stat;
+    var updRows = {};
+    updates.forEach(function(u){ updRows[u.row.createdAt + '|' + impKey(u.row.branch, u.row.requester, u.row.content)] = true; });
+    $('#imp-n-new').textContent = news.length;
+    $('#imp-n-upd').textContent = updates.length;
+    $('#imp-n-dup').textContent = stat.same;
+    $('#imp-n-app').textContent = stat.appEdited;
+    $('#imp-n-filedup').textContent = stat.filedup;
+    $('#imp-n-skip').textContent = stat.nodate + stat.example + stat.badcol;
+    var det = [];
+    if(stat.example) det.push('예시/양식 행 ' + stat.example);
+    if(stat.nodate) det.push('날짜 인식 불가 ' + stat.nodate);
+    if(stat.badcol) det.push('지점 칸에 날짜/숫자가 들어간 행 ' + stat.badcol + ' (엑셀 열 위치 확인 필요)');
+    if(stat.unsupported.length) det.push('양식을 인식하지 못한 시트: ' + stat.unsupported.join(', '));
+    $('#imp-skip-detail').textContent = (det.length ? '기타 제외 내역 — ' + det.join(' · ') + '. ' : '') + (stat.fixedDate ? '날짜가 비어 있는 ' + stat.fixedDate + '건은 바로 윗 행의 날짜로 넣습니다. ' : '') + '지점·작성자가 비어 있으면 \'미지정\'·\'미상\'으로 저장합니다. 업데이트는 엑셀에 값이 있는 칸만 반영하며, 엑셀이 비어 있다고 기존 값을 지우지 않습니다. 앱에서 이미 수정·답변 처리된 건은 건너뜁니다. 내용이 비어 있는 행(' + stat.blank + ')은 집계에서 뺐습니다.';
+    var sample = $('#imp-sample');
+    var html = '';
+    news.slice(0, 5).forEach(function(r){
+      html += '<div><span class="d">' + esc(r.createdAt.slice(0, 10)) + '</span><span class="b">신규 · ' + esc(r.branch) + '</span><span class="c">' + esc(r.content.replace(/\s+/g, ' ')) + '</span></div>';
+    });
+    if(news.length > 5) html += '<div><span class="c" style="color:var(--ink-muted)">… 신규 외 ' + (news.length - 5) + '건</span></div>';
+    updates.slice(0, 5).forEach(function(u){
+      html += '<div><span class="d">' + esc((u.ticket.createdAt || '').slice(0, 10)) + '</span><span class="b">변경 · ' + esc(u.ticket.branch) + '</span><span class="c">' + esc(u.labels.join(', ')) + '</span></div>';
+    });
+    if(updates.length > 5) html += '<div><span class="c" style="color:var(--ink-muted)">… 변경 외 ' + (updates.length - 5) + '건</span></div>';
+    sample.innerHTML = html;
+    sample.hidden = !html;
+    $('#import-result').hidden = false;
+    $('#imp-update-wrap').hidden = !updates.length;
+    impRefreshCommitBtn();
+    impMsg('');
+  }
+
+  function impRefreshCommitBtn(){
+    var btn = $('#import-commit');
+    if(!imp.plan){ btn.disabled = true; return; }
+    var nNew = imp.plan.news.length;
+    var nUpd = ($('#imp-do-update') && $('#imp-do-update').checked) ? imp.plan.updates.length : 0;
+    btn.disabled = !(nNew + nUpd);
+    var parts = [];
+    if(nNew) parts.push('신규 ' + nNew + '건 추가');
+    if(nUpd) parts.push(nUpd + '건 업데이트');
+    btn.textContent = parts.length ? parts.join(' + ') + '하기' : '반영할 내용이 없습니다';
+  }
+
+  function impRenderSheets(){
+    var box = $('#import-sheets');
+    if(imp.isCsv || imp.sheetNames.length <= 1){ box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false;
+    box.innerHTML = imp.sheetNames.map(function(n){
+      return '<label><input type="checkbox" data-sheet="' + esc(n) + '"' + (imp.selected[n] ? ' checked' : '') + '>' + esc(n) + '</label>';
+    }).join('');
+    $all('input[data-sheet]', box).forEach(function(cb){
+      cb.addEventListener('change', function(){
+        imp.selected[cb.getAttribute('data-sheet')] = cb.checked;
+        runAnalyzeSafe();
+      });
+    });
+  }
+
+  function runAnalyzeSafe(){
+    impMsg('분석 중…');
+    // 큰 파일일 수 있어 화면이 먼저 그려지도록 한 박자 늦춰서 실행
+    setTimeout(function(){
+      try{ impAnalyze(); }
+      catch(err){ console.error('import analyze failed', err); impMsg('파일을 분석하지 못했습니다. 파일 형식을 확인해주세요.', 'err'); }
+    }, 30);
+  }
+
+  function impOnFile(file){
+    impReset();
+    if(!file) return;
+    if(!state.ticketsLoaded || state.ticketsError){
+      impMsg('접수 목록을 아직 불러오지 못했습니다. 잠시 후 다시 시도해주세요. (중복 판정을 위해 기존 접수 목록이 필요합니다)', 'err');
+      return;
+    }
+    imp.file = file;
+    imp.isCsv = /\.csv$/i.test(file.name);
+    impMsg('파일 읽는 중…');
+    Promise.all([loadXlsxLib(), file.arrayBuffer()]).then(function(res){
+      var XLSX = res[0];
+      imp.buf = res[1];
+      if(imp.isCsv){
+        imp.sheetNames = [file.name]; imp.selected[file.name] = true;
+      } else {
+        var wb = XLSX.read(imp.buf, { type:'array', bookSheets:true });
+        imp.sheetNames = wb.SheetNames.slice();
+        var anyDefault = imp.sheetNames.some(function(n){ return IMPORT_DEFAULT_SHEET.test(n); });
+        imp.sheetNames.forEach(function(n){ imp.selected[n] = anyDefault ? IMPORT_DEFAULT_SHEET.test(n) : true; });
+      }
+      impRenderSheets();
+      runAnalyzeSafe();
+    }).catch(function(err){
+      console.error('import read failed', err);
+      impMsg(err && err.message === 'xlsx_load_failed' ? '엑셀 처리 모듈을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.' : '파일을 읽지 못했습니다. 파일이 손상되었거나 지원하지 않는 형식입니다.', 'err');
+    });
+  }
+
+  function impCommit(){
+    if(imp.busy || !imp.plan) return;
+    if(!state.db){ impMsg('데이터베이스에 연결되어 있지 않습니다.', 'err'); return; }
+    if(!state.identity || state.identity.role !== 'admin'){ impMsg('전체관리자만 업로드할 수 있습니다.', 'err'); return; }
+    var doUpd = !!($('#imp-do-update') && $('#imp-do-update').checked);
+    var news = imp.plan.news.slice();
+    var upds = doUpd ? imp.plan.updates.slice() : [];
+    if(!news.length && !upds.length) return;
+    var ops = [];
+    news.forEach(function(r){ ops.push({ kind:'new', row:r }); });
+    upds.forEach(function(u){ ops.push({ kind:'upd', u:u }); });
+    var batchTag = nowIso();
+    var actor = memberActor();
+    var btn = $('#import-commit');
+    imp.busy = true; btn.disabled = true;
+    var done = 0, CHUNK = 400;
+    function next(){
+      if(done >= ops.length){
+        imp.busy = false;
+        news.forEach(function(r){
+          impAdded.extra.push({ id:'__added', branch:r.branch, requester:r.requester, content:r.content, category:r.category, menuPath:r.menuPath,
+            memberName:r.memberName, memberNumber:r.memberNumber, answer:r.answer, status:r.status, createdAt:r.createdAt, updatedAt:r.createdAt, importedAt:batchTag });
+        });
+        upds.forEach(function(u){ impAdded.patched[u.id] = Object.assign({}, impAdded.patched[u.id] || {}, u.changes); });
+        // 같은 파일을 다시 분석해 "반영할 내용 없음" 상태로 정리
+        try{ impAnalyze(); }catch(e){ console.error(e); }
+        impMsg('완료: 신규 ' + news.length + '건 추가, ' + upds.length + '건 업데이트했습니다.', 'ok');
+        return;
+      }
+      var slice = ops.slice(done, done + CHUNK);
+      var batch = state.db.batch();
+      slice.forEach(function(op){
+        if(op.kind === 'new'){
+          var r = op.row;
+          batch.set(state.db.collection('tickets').doc(), {
+            branch: r.branch,
+            requester: r.requester,
+            phone: '000-000-0000',
+            requesterRole: 'requester',
+            category: r.category,
+            menuPath: r.menuPath,
+            memberName: r.memberName,
+            memberNumber: r.memberNumber,
+            type: '기타',
+            content: r.content,
+            attachments: [],
+            status: r.status,
+            answer: r.answer,
+            answeredBy: '',
+            answeredAt: '',
+            createdAt: r.createdAt,
+            updatedAt: r.createdAt,
+            importedAt: batchTag,
+            importedBy: actor
+          });
+        } else {
+          // updatedAt은 그대로 둠 — 이후에도 "앱에서 수정된 건"으로 오인되지 않게 하기 위함
+          batch.update(state.db.collection('tickets').doc(op.u.id), Object.assign({}, op.u.changes, { importedAt: batchTag, importedBy: actor }));
+        }
+      });
+      impMsg('저장 중… ' + done + ' / ' + ops.length);
+      batch.commit().then(function(){
+        done += slice.length;
+        next();
+      }).catch(function(err){
+        console.error('import commit failed', err);
+        imp.busy = false; btn.disabled = false;
+        impMsg('저장 중 오류가 발생했습니다 (' + done + '건 저장 후 중단). 같은 파일을 다시 올리면 저장된 건은 자동으로 제외되고 나머지만 반영됩니다. [' + ((err && err.code) || 'unknown') + ']', 'err');
+      });
+    }
+    next();
+  }
+
+  function initImport(){
+    var open = $('#btn-open-import');
+    if(!open) return;
+    function close(){ if(imp.busy) return; $('#import-backdrop').hidden = true; impReset(); }
+    open.addEventListener('click', function(){
+      if(!state.identity || state.identity.role !== 'admin') return;
+      impReset();
+      $('#import-backdrop').hidden = false;
+    });
+    $('#import-close').addEventListener('click', close);
+    $('#import-cancel').addEventListener('click', close);
+    $('#import-backdrop').addEventListener('click', function(e){ if(e.target === $('#import-backdrop')) close(); });
+    $('#import-file').addEventListener('change', function(e){ impOnFile(e.target.files && e.target.files[0]); });
+    $('#import-commit').addEventListener('click', impCommit);
+    $('#imp-do-update').addEventListener('change', impRefreshCommitBtn);
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && !$('#import-backdrop').hidden) close(); });
+  }
+
   function bindModal(){
     $('#modal-close').addEventListener('click', closeModal);
     $('#modal-cancel').addEventListener('click', closeModal);
@@ -3992,6 +4513,7 @@
     initBranchRuleControls();
     initStatsControls();
     bindModal();
+    initImport();
     bindConfirmAndNotify();
     bindGlobalEvents();
 

@@ -18,3 +18,7 @@ migration/*.json
 .DS_Store
 .vscode/
 node_modules/
+
+# 자동 백업 / 배포 스크립트 (로컬 전용)
+_backup/
+deploy.bat
