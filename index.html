@@ -204,6 +204,10 @@
   .btn-ghost:hover{ background:var(--surface-2); }
   .btn-sm{ padding:7px 12px; font-size:12.5px; border-radius:8px; }
   .login-foot{ margin-top:16px; font-size:11.5px; color:var(--ink-muted); text-align:center; }
+  .auto-login{ display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink-2); margin:2px 0 14px; cursor:pointer; }
+  .auto-login input{ width:auto; margin:0; }
+  .login-divider{ display:flex; align-items:center; gap:10px; margin:18px 0 12px; font-size:11.5px; color:var(--ink-muted); }
+  .login-divider::before,.login-divider::after{ content:""; flex:1; height:1px; background:var(--border); }
   .login-error{
     background:var(--critical-soft); color:var(--critical);
     border-radius:8px; padding:9px 11px; font-size:12.5px;
@@ -877,10 +881,33 @@
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg>
     </div>
 
-    <!-- ---- gate: login form ---- -->
-    <div id="gate-form">
+    <!-- ---- gate: 간편 로그인 (첫 화면) ---- -->
+    <div id="gate-simple">
       <h1>전산 요청 관리</h1>
-      <p class="login-sub">지점 정보를 입력하고 접수 등록·조회를 시작하세요.</p>
+      <p class="login-sub">등록된 이름과 연락처로 간편하게 로그인하세요.</p>
+
+      <div id="simple-error" class="login-error" hidden></div>
+
+      <form id="simple-form" novalidate>
+        <div class="field">
+          <label for="sl-name">이름 <span class="req">*</span></label>
+          <input id="sl-name" type="text" placeholder="홍길동" autocomplete="name" required>
+        </div>
+        <div class="field">
+          <label for="sl-phone">연락처 <span class="req">*</span></label>
+          <input id="sl-phone" type="tel" inputmode="numeric" placeholder="010-0000-0000" autocomplete="tel" required maxlength="13">
+        </div>
+        <label class="auto-login"><input type="checkbox" id="sl-auto" checked> 자동 로그인</label>
+        <button type="submit" class="btn btn-primary">로그인</button>
+      </form>
+      <div class="login-divider"><span>처음 이용하시나요?</span></div>
+      <button type="button" class="btn btn-ghost" id="btn-go-register" style="width:100%;">신규 등록</button>
+    </div>
+
+    <!-- ---- gate: login form ---- -->
+    <div id="gate-form" hidden>
+      <h1>신규 등록</h1>
+      <p class="login-sub">지점 정보를 입력해 이용 신청을 해주세요.</p>
 
       <div id="login-error" class="login-error" hidden></div>
 
@@ -907,9 +934,11 @@
           <label for="in-phone">연락처 <span class="req">*</span></label>
           <input id="in-phone" name="phone" type="tel" inputmode="numeric" placeholder="010-0000-0000" autocomplete="off" required maxlength="13">
         </div>
-        <button type="submit" class="btn btn-primary">로그인하고 시작하기</button>
+        <label class="auto-login"><input type="checkbox" id="in-auto" checked> 자동 로그인</label>
+        <button type="submit" class="btn btn-primary">신규 등록 신청</button>
       </form>
-      <p class="login-foot">최초 접속 시 전체관리자 승인 후 이용할 수 있습니다. 입력한 정보는 이 브라우저에 저장됩니다.</p>
+      <p class="login-foot">최초 접속 시 전체관리자 승인 후 이용할 수 있습니다.</p>
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-go-simple" style="width:100%;margin-top:10px;">← 간편 로그인으로 돌아가기</button>
     </div>
 
     <!-- ---- gate: checking ---- -->
@@ -1664,9 +1693,10 @@
   /* ================================================================ */
   /* IDENTITY / LOGIN                                                   */
   /* ================================================================ */
+  var autoLogin = true; // 자동 로그인: true=이 브라우저에 계속 저장(localStorage), false=탭 세션 동안만(sessionStorage)
   function loadIdentity(){
     try{
-      var raw = localStorage.getItem(LS_KEY);
+      var raw = localStorage.getItem(LS_KEY) || sessionStorage.getItem(LS_KEY);
       if(!raw) return null;
       var parsed = JSON.parse(raw);
       if(parsed && parsed.branch && parsed.name && parsed.phone) return parsed;
@@ -1674,10 +1704,12 @@
     }catch(e){ return null; }
   }
   function saveIdentity(id){
-    try{ localStorage.setItem(LS_KEY, JSON.stringify(id)); }catch(e){}
+    var raw = JSON.stringify(id);
+    try{ localStorage.removeItem(LS_KEY); sessionStorage.removeItem(LS_KEY); }catch(e){}
+    try{ (autoLogin ? localStorage : sessionStorage).setItem(LS_KEY, raw); }catch(e){}
   }
   function clearIdentity(){
-    try{ localStorage.removeItem(LS_KEY); }catch(e){}
+    try{ localStorage.removeItem(LS_KEY); sessionStorage.removeItem(LS_KEY); }catch(e){}
   }
 
   function formatPhoneInput(v){
@@ -1835,11 +1867,57 @@
         return;
       }
       showLoginError('', true);
+      autoLogin = $('#in-auto').checked;
       routeIdentity({ branch: branch, name: name, phone: phone });
+    });
+
+    $('#sl-phone').addEventListener('input', function(e){ e.target.value = formatPhoneInput(e.target.value); });
+    $('#btn-go-register').addEventListener('click', function(){ showLoginError('', true); showGate('form'); });
+    $('#btn-go-simple').addEventListener('click', function(){ showSimpleError('', true); showGate('simple'); });
+    $('#simple-form').addEventListener('submit', function(e){
+      e.preventDefault();
+      simpleLogin($('#sl-name').value.trim(), $('#sl-phone').value.trim());
     });
 
     $('#btn-pending-logout').addEventListener('click', doLogout);
     $('#btn-rejected-logout').addEventListener('click', doLogout);
+  }
+
+  function showSimpleError(msg, hide){
+    var el = $('#simple-error');
+    el.textContent = msg || '';
+    el.hidden = !!hide || !msg;
+  }
+
+  /* 간편 로그인: 이미 등록된 이름 + 연락처만 확인 (신규 등록은 별도 버튼) */
+  function simpleLogin(name, phone){
+    var digits = digitsOnly(phone);
+    if(!name || !digits){ showSimpleError('이름과 연락처를 입력해주세요.'); return; }
+    if(digits.length < 9){ showSimpleError('연락처를 정확히 입력해주세요.'); return; }
+    showSimpleError('', true);
+    autoLogin = $('#sl-auto').checked;
+    var squash = function(v){ return String(v||'').replace(/\s+/g,''); };
+    showGate('checking');
+    resolveDb().then(function(db){
+      if(!db){ showGate('simple'); showSimpleError('서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.'); return; }
+      db.collection('members').doc(digits).get().then(function(snap){
+        if(!snap.exists){
+          if(digits === ADMIN_PHONE_DIGITS && squash(name) === squash(ADMIN_NAME)){
+            state.memberKey = digits; routeIdentity({ branch: ADMIN_BRANCH, name: ADMIN_NAME, phone: phone }); return;
+          }
+          showGate('simple'); showSimpleError('등록된 정보가 없습니다. 아래 "신규 등록"을 이용해주세요.'); return;
+        }
+        var m = snap.data();
+        if(squash(m.name) !== squash(name)){
+          showGate('simple'); showSimpleError('이름이 등록된 정보와 일치하지 않습니다.'); return;
+        }
+        state.memberKey = digits;
+        subscribeMember(db, digits);
+      }).catch(function(err){
+        console.error('simple login failed', err);
+        showGate('simple'); showSimpleError('확인 중 오류가 발생했습니다. 다시 시도해주세요.');
+      });
+    });
   }
 
   function showLoginError(msg, hide){
@@ -1849,12 +1927,13 @@
   }
 
   function showGate(which){
-    ['form','checking','pending','rejected'].forEach(function(g){
+    ['simple','form','checking','pending','rejected'].forEach(function(g){
       $('#gate-' + g).hidden = (g !== which);
     });
   }
 
   function showPendingScreen(member){
+    if(member && member.branch && member.name && member.phone) saveIdentity({ branch:member.branch, name:member.name, phone:member.phone, role:member.role || 'requester' });
     $('#pending-branch').textContent = member.branch || '-';
     $('#pending-name').textContent = member.name || '-';
     $('#pending-phone').textContent = member.phone || '-';
@@ -1967,7 +2046,7 @@
   function subscribeMember(db, key){
     if(state.memberUnsub){ state.memberUnsub(); }
     state.memberUnsub = db.collection('members').doc(key).onSnapshot(function(snap){
-      if(!snap.exists){ showGate('form'); $('#app').hidden = true; return; }
+      if(!snap.exists){ showGate('simple'); $('#app').hidden = true; return; }
       var m = snap.data();
       if(m.status === 'approved'){
         finalizeLogin({ branch:m.branch, name:m.name, phone:m.phone }, m.role || 'requester');
@@ -4570,6 +4649,7 @@
 
     var existing = loadIdentity();
     if(existing){
+      try{ autoLogin = !!localStorage.getItem(LS_KEY); }catch(e){}
       routeIdentity(existing);
     }
   }
