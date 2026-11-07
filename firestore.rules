@@ -1,50 +1,171 @@
 rules_version = '2';
 
 // ============================================================================
-// 전산 요청 관리 시스템 — Firestore 보안 규칙 (초안)
+// 전산 요청 관리 시스템 — Firestore 보안 규칙 (Firebase Authentication 적용)
 //
-// 이 앱은 별도 Firebase Auth 로그인 없이 "지점/이름/전화번호"만으로 접속하는
-// 구조라, Firestore 규칙만으로는 "이 요청이 실제로 그 전화번호의 소유자가
-// 보낸 것"까지는 검증할 수 없습니다. 최소한 아래를 보장합니다:
-//   - members 신규 가입은 pending 상태로만 생성 가능 (그 외 필드로 바로
-//     승인 상태를 만들어 셀프 승인하는 것은 막음)
-//   - 승인/거절/차단/권한변경(update)과 분류·유형·지점 설정(config) 저장은
-//     지금은 Auth가 없어 "관리자 화면에서만 호출한다"는 프런트엔드 신뢰에
-//     의존합니다 — Auth 도입 전까지의 임시 조치이니 참고하세요.
+// 로그인: 이메일/비밀번호. 화면에는 "연락처 + 비밀번호"만 보이고 내부 이메일은
+//     <연락처>_<랜덤>@jjangkait001.firebaseapp.com   (일반 직원: 첫 설정·초기화·신규 등록)
+//     <연락처>@jjangkait001.firebaseapp.com          (최고관리자만 — 콘솔에서 미리 만든 계정)
+//   members.authEmail = 지금 유효한 로그인 계정. 이 값과 같은 계정만 인정합니다.
+//   기존 직원은 authEmail이 없으므로 관리자가 발급한 "첫 설정 코드"로만 계정을 연결할 수 있습니다.
 //
-// ⚠️ 중요: 지금 구조(전화번호 자율 입력)로는 진짜 프로덕션 보안을 100%
-// 확보하기 어렵습니다. 정식 오픈 전 Firebase Authentication(전화번호 인증
-// 또는 커스텀 토큰)을 붙이는 것을 강하게 권장합니다. 아래 규칙은 "인증 없는
-// 상태에서 최소한의 방어선"이며, Auth 도입 전까지의 임시 조치로 봐주세요.
+// 권한
+//   접수(tickets)  읽기: 승인된 사용자
+//                  등록: 본인 이름·연락처·지점으로만 (admin은 엑셀 가져오기용으로 제한 없음)
+//                  처리상태·답변·지점 변경·삭제: admin, manager / 내용 수정: 작성자 본인(내용 항목만)
+//   설정(config)   읽기: 승인된 사용자 / 쓰기: admin
+//   회원(members)  읽기: 승인된 사용자 + 본인 / 가입: '승인 대기 + 요청자'로만
+//                  승인·권한·지점 변경: admin (로그인 계정은 바꿀 수 없음, 최고관리자 문서는 본인만)
+//
+// 코드 (resetCodes/{연락처}_{코드}, admin만 읽기)
+//   kind 'setup' : 첫 설정 코드, 영문+숫자 8자리, 24시간
+//   kind 'reset' : 비밀번호 초기화 코드, 숫자 6자리, 30분
+//   사용자는 새 로그인 계정을 만든 뒤 한 번에(batch) members.authEmail 변경 + 코드 삭제 + logins 갱신.
 // ============================================================================
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // 회원(멤버) — 승인 대기/거절/역할 정보. 조회는 필요하지만(현재 로그인한
-    // 사람이 승인됐는지 확인해야 하므로) 쓰기는 최소화합니다.
+    // 최고관리자 연락처 (index.html의 ADMIN_PHONE_DIGITS와 같아야 함)
+    function superId() { return '01094820353'; }
+    function domain() { return 'jjangkait001.firebaseapp.com'; }
+
+    function signedIn() {
+      return request.auth != null
+        && request.auth.token.email is string
+        && request.auth.token.email.matches('^[0-9]+(_[a-z0-9]+)?@jjangkait001[.]firebaseapp[.]com$');
+    }
+    function myEmail() { return request.auth.token.email; }
+    function myId() { return myEmail().split('@')[0].split('_')[0]; }
+    function legacyEmail(id) { return id + '@' + domain(); }
+    function memberPath(id) { return /databases/$(database)/documents/members/$(id); }
+    function codePath(id) { return /databases/$(database)/documents/resetCodes/$(id); }
+    function me() { return get(memberPath(myId())).data; }
+
+    // 회원 정보가 가리키는 로그인 계정인지. authEmail이 없으면 최고관리자만 예전 형식 계정을 인정
+    function defaultEmail() { return myId() == superId() ? legacyEmail(superId()) : '-'; }
+    function isMyAccount(m) { return m.get('authEmail', defaultEmail()) == myEmail(); }
+
+    function approved()  { return signedIn() && exists(memberPath(myId())) && isMyAccount(me()) && me().status == 'approved'; }
+    function isAdmin()   { return approved() && me().role == 'admin'; }
+    function canManage() { return approved() && me().role in ['admin', 'manager']; }
+
+    function codeTtl(c) { return c.get('kind', 'reset') == 'setup' ? duration.value(24, 'h') : duration.value(30, 'm'); }
+    function validCode(kind, code) {
+      return code is string && (
+        (kind == 'reset' && code.matches('^[0-9]{6}$'))
+        || (kind == 'setup' && code.matches('^[A-HJKMNP-Z2-9]{8}$')));
+    }
+
+    // 코드로 회원 정보의 로그인 계정을 새 계정으로 바꾸는 경우
+    function resetByCode(memberId) {
+      let code = request.resource.data.lastResetCode;
+      let cp = codePath(memberId + '_' + code);
+      return signedIn() && memberId == myId() && memberId != superId()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['authEmail', 'lastResetCode', 'resetAt'])
+        && request.resource.data.authEmail == myEmail()
+        && code is string
+        && request.resource.data.resetAt == request.time
+        && exists(cp)
+        && get(cp).data.createdAt + codeTtl(get(cp).data) > request.time
+        && !existsAfter(cp);
+    }
+
+    // 코드 문서를 사용자가 쓰고 폐기하는 경우 (위 resetByCode와 같은 batch에서만 통과)
+    function consumeCode() {
+      let after = getAfter(memberPath(myId())).data;
+      return signedIn() && myId() != superId()
+        && resource.data.phone == myId()
+        && resource.data.createdAt + codeTtl(resource.data) > request.time
+        && after.get('authEmail', '') == myEmail()
+        && after.get('lastResetCode', '') == resource.data.code;
+    }
+
     match /members/{memberId} {
-      allow read: if true; // 승인 상태 확인을 위해 열람은 허용
-      // 최초 가입(pending 상태로 생성)만 허용. 승인/거절/차단/권한변경은 회원관리
-      // 화면(전체관리자·운영관리자)에서 클라이언트가 직접 update()를 호출하는 구조라,
-      // 여기를 false로 막아두면 그 기능들이 전부 조용히 실패합니다 —
-      // Auth 도입 전까지는 열어두고, 도입 후 admin 커스텀 클레임 검사로 교체하세요.
-      allow create: if request.resource.data.status == 'pending';
-      allow update, delete: if true; // TODO: Auth 도입 후 admin만 허용으로 교체
+      allow read: if approved() || (signedIn() && memberId == myId());
+
+      allow create: if signedIn() && memberId == myId()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.authEmail == myEmail()
+        && (
+          (request.resource.data.status == 'pending' && request.resource.data.role == 'requester')
+          || (memberId == superId()
+              && myEmail() == legacyEmail(memberId)
+              && request.resource.data.status == 'approved'
+              && request.resource.data.role == 'admin')
+        );
+
+      allow update: if (isAdmin()
+          && request.resource.data.role in ['admin', 'manager', 'requester']
+          && request.resource.data.status in ['pending', 'approved', 'rejected']
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['authEmail', 'lastResetCode', 'resetAt'])
+          && (memberId != superId() || memberId == myId()))
+        || resetByCode(memberId);
+
+      allow delete: if isAdmin() && memberId != superId();
+    }
+
+    // 연락처 → 현재 로그인 계정 이메일 (로그인 화면에서 로그인 전에 1건씩만 조회)
+    match /logins/{phone} {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if signedIn() && phone == myId()
+        && request.resource.data.keys().hasOnly(['email'])
+        && request.resource.data.email == myEmail()
+        && getAfter(memberPath(phone)).data.get('authEmail', '') == myEmail();
+      allow delete: if isAdmin() && phone != superId();
+    }
+
+    // 비밀번호 초기화 요청 (로그인 없이 등록)
+    match /resetRequests/{phone} {
+      allow create, update: if phone.matches('^01[0-9]{8,9}$') && phone != superId()
+        && request.resource.data.keys().hasOnly(['phone', 'requestedAt'])
+        && request.resource.data.phone == phone
+        && request.resource.data.requestedAt == request.time;
+      allow read, delete: if isAdmin();
+    }
+
+    // 첫 설정 코드 / 초기화 코드 (문서 ID = 연락처_코드). admin만 읽을 수 있음
+    match /resetCodes/{codeId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['phone', 'code', 'kind', 'createdAt', 'createdBy'])
+        && request.resource.data.phone is string
+        && request.resource.data.phone != superId()
+        && validCode(request.resource.data.kind, request.resource.data.code)
+        && codeId == request.resource.data.phone + '_' + request.resource.data.code
+        && request.resource.data.createdAt == request.time;
+      allow delete: if isAdmin() || consumeCode();
+    }
+
+    // 접수 티켓
+    function ownTicketOk() {
+      let d = request.resource.data;
+      let m = me();
+      return d.keys().hasAll(['branch', 'requester', 'phone', 'status', 'createdAt'])
+        && d.phone == m.phone && d.requester == m.name && d.branch == m.branch
+        && d.get('requesterRole', 'requester') == m.get('role', 'requester')
+        && d.status == '접수'
+        && d.get('answer', '') == '' && d.get('answeredBy', '') == '';
+    }
+    function ownerEditOk() {
+      return approved() && resource.data.phone == me().phone
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['content', 'category', 'menuPath', 'memberName', 'memberNumber', 'type', 'updatedAt']);
+    }
+
+    match /tickets/{ticketId} {
+      allow read: if approved();
+      allow create: if isAdmin() || (approved() && ownTicketOk());
+      allow update: if canManage() || ownerEditOk();
+      allow delete: if canManage();
     }
 
     // 분류/유형/지점 등 공통 설정
     match /config/{docId} {
-      allow read: if true;
-      allow write: if true; // TODO: Auth 도입 후 admin만 허용으로 교체 (지금은 write:false였던 탓에
-                             // 기준관리(분류/유형/지점, 지점↔본사 이동 포함) 저장이 전부 막혀 있었음)
-    }
-
-    // 접수 티켓
-    match /tickets/{ticketId} {
-      allow read: if true;
-      allow create: if request.resource.data.keys().hasAll(['branch','requester','phone','status','createdAt']);
-      allow update, delete: if true; // TODO: Auth 도입 후 작성자 본인 또는 관리자만 허용으로 교체
+      allow read: if approved();
+      allow write: if isAdmin();
     }
   }
 }

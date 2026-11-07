@@ -1,25 +1,51 @@
 rules_version = '2';
 
 // ============================================================================
-// 전산 요청 관리 시스템 — Firebase Storage 보안 규칙 (초안)
+// 전산 요청 관리 시스템 — Firebase Storage 보안 규칙 (Firebase Authentication 적용)
 //
-// firestore.rules와 동일한 이유로, 별도 Firebase Auth 없이는 "누가 업로드했는지"
-// 완벽히 검증할 수 없습니다. 최소한 아래만 보장합니다:
-//   - 첨부파일은 앱이 실제로 쓰는 attachments/ 경로 아래에서만 읽기/쓰기 가능
-//   - 파일 크기(10MB)와 형식(이미지만 허용, PDF 제외)만 제한
-//
-// ⚠️ 정식 오픈 후 트래픽이 늘면 Firebase Authentication 도입을 권장합니다.
+// Firestore의 members 문서를 직접 확인합니다(교차 서비스 규칙).
+//   - 첨부파일 보기·올리기: 로그인 + 승인된 사용자만
+//   - 올릴 때 metadata.owner = 본인 연락처(앱이 자동으로 넣음)
+//   - 삭제: 올린 본인 또는 전체관리자 / 덮어쓰기: 불가
+//   - 크기 10MB 미만, 이미지 형식만
+// 처음 배포할 때 Firebase CLI가 "Storage가 Firestore를 읽도록 권한 부여"를 물으면 Yes를 선택하세요.
 // ============================================================================
 
 service firebase.storage {
   match /b/{bucket}/o {
-    match /attachments/{fileName} {
-      allow read: if true;
-      allow write: if request.resource.size < 10 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if true; // TODO: Auth 도입 후 작성자 본인 또는 관리자만 허용으로 교체
+
+    // 최고관리자 연락처 (firestore.rules와 같아야 함)
+    function superId() { return '01094820353'; }
+
+    function signedIn() {
+      return request.auth != null
+        && request.auth.token.email is string
+        && request.auth.token.email.matches('^[0-9]+(_[a-z0-9]+)?@jjangkait001[.]firebaseapp[.]com$');
     }
-    // 그 외 경로는 기본적으로 차단
+    function myId() { return request.auth.token.email.split('@')[0].split('_')[0]; }
+    function memberPath() { return /databases/(default)/documents/members/$(myId()); }
+    function defaultEmail() { return myId() == superId() ? superId() + '@jjangkait001.firebaseapp.com' : '-'; }
+
+    function approved() {
+      return signedIn()
+        && firestore.exists(memberPath())
+        && firestore.get(memberPath()).data.get('authEmail', defaultEmail()) == request.auth.token.email
+        && firestore.get(memberPath()).data.status == 'approved';
+    }
+    function isAdmin() { return approved() && firestore.get(memberPath()).data.role == 'admin'; }
+
+    match /attachments/{fileName} {
+      allow read: if approved();
+      allow create: if approved()
+        && resource == null   // 같은 이름의 파일이 있으면 덮어쓰기 차단
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*')
+        && request.resource.metadata.owner == myId();
+      allow update: if false;
+      allow delete: if isAdmin() || (approved() && resource.metadata.get('owner', '') == myId());
+    }
+
+    // 그 외 경로는 모두 차단
     match /{allPaths=**} {
       allow read, write: if false;
     }

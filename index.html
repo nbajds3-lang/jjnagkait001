@@ -881,33 +881,36 @@
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg>
     </div>
 
-    <!-- ---- gate: 간편 로그인 (첫 화면) ---- -->
+    <!-- ---- gate: 로그인 (첫 화면) — 연락처 + 비밀번호 ---- -->
     <div id="gate-simple">
       <h1>전산 요청 관리</h1>
-      <p class="login-sub">등록된 이름과 연락처로 간편하게 로그인하세요.</p>
+      <p class="login-sub">연락처와 비밀번호로 로그인하세요.</p>
 
       <div id="simple-error" class="login-error" hidden></div>
 
       <form id="simple-form" novalidate>
         <div class="field">
-          <label for="sl-name">이름 <span class="req">*</span></label>
-          <input id="sl-name" type="text" placeholder="홍길동" autocomplete="name" required>
+          <label for="sl-phone">연락처 <span class="req">*</span></label>
+          <input id="sl-phone" type="tel" inputmode="numeric" placeholder="010-0000-0000" autocomplete="username" required maxlength="13">
         </div>
         <div class="field">
-          <label for="sl-phone">연락처 <span class="req">*</span></label>
-          <input id="sl-phone" type="tel" inputmode="numeric" placeholder="010-0000-0000" autocomplete="tel" required maxlength="13">
+          <label for="sl-pw">비밀번호 <span class="req">*</span></label>
+          <input id="sl-pw" type="password" autocomplete="current-password" required>
         </div>
         <label class="auto-login"><input type="checkbox" id="sl-auto" checked> 자동 로그인</label>
         <button type="submit" class="btn btn-primary">로그인</button>
       </form>
+      <div class="login-divider"><span>기존 직원 · 비밀번호 분실</span></div>
+      <button type="button" class="btn btn-ghost" id="btn-go-code" style="width:100%;">코드로 비밀번호 설정 (첫 설정·초기화)</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-go-resetreq" style="width:100%;margin-top:8px;">비밀번호를 잊었어요 (초기화 요청)</button>
       <div class="login-divider"><span>처음 이용하시나요?</span></div>
       <button type="button" class="btn btn-ghost" id="btn-go-register" style="width:100%;">신규 등록</button>
     </div>
 
-    <!-- ---- gate: login form ---- -->
+    <!-- ---- gate: 신규 등록 ---- -->
     <div id="gate-form" hidden>
       <h1>신규 등록</h1>
-      <p class="login-sub">지점 정보를 입력해 이용 신청을 해주세요.</p>
+      <p class="login-sub">지점 정보를 입력해 이용 신청을 해주세요.<br>이미 등록된 직원은 관리자에게 받은 <b>첫 설정 코드</b>를 이용하세요.</p>
 
       <div id="login-error" class="login-error" hidden></div>
 
@@ -932,13 +935,68 @@
         </div>
         <div class="field">
           <label for="in-phone">연락처 <span class="req">*</span></label>
-          <input id="in-phone" name="phone" type="tel" inputmode="numeric" placeholder="010-0000-0000" autocomplete="off" required maxlength="13">
+          <input id="in-phone" name="phone" type="tel" inputmode="numeric" placeholder="010-0000-0000" autocomplete="username" required maxlength="13">
+        </div>
+        <div class="field">
+          <label for="in-pw">비밀번호 (6자 이상) <span class="req">*</span></label>
+          <input id="in-pw" type="password" autocomplete="new-password" required>
+        </div>
+        <div class="field">
+          <label for="in-pw2">비밀번호 확인 <span class="req">*</span></label>
+          <input id="in-pw2" type="password" autocomplete="new-password" required>
         </div>
         <label class="auto-login"><input type="checkbox" id="in-auto" checked> 자동 로그인</label>
         <button type="submit" class="btn btn-primary">신규 등록 신청</button>
       </form>
       <p class="login-foot">최초 접속 시 전체관리자 승인 후 이용할 수 있습니다.</p>
-      <button type="button" class="btn btn-ghost btn-sm" id="btn-go-simple" style="width:100%;margin-top:10px;">← 간편 로그인으로 돌아가기</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-go-simple style="width:100%;margin-top:10px;">← 로그인으로 돌아가기</button>
+    </div>
+
+    <!-- ---- gate: 코드로 비밀번호 설정 (첫 설정 24시간 / 초기화 30분) ---- -->
+    <div id="gate-code" hidden>
+      <h1>비밀번호 설정</h1>
+      <p class="login-sub">관리자에게 받은 코드로 새 비밀번호를 정합니다.<br><b>첫 설정 코드</b>(영문+숫자 8자리, 24시간) 또는 <b>초기화 코드</b>(숫자 6자리, 30분)</p>
+
+      <div id="code-ok" class="login-error" style="background:var(--good-soft,#e7f6ec);color:var(--good,#1a7f37);border-color:transparent;" hidden></div>
+      <div id="code-error" class="login-error" hidden></div>
+
+      <form id="code-form" novalidate>
+        <div class="field">
+          <label for="cd-phone">연락처 <span class="req">*</span></label>
+          <input id="cd-phone" type="tel" inputmode="numeric" placeholder="010-0000-0000" autocomplete="username" required maxlength="13">
+        </div>
+        <div class="field">
+          <label for="cd-code">코드 <span class="req">*</span></label>
+          <input id="cd-code" type="text" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" placeholder="예: K7MP-4XQ9 또는 482913" maxlength="12" required>
+        </div>
+        <div class="field">
+          <label for="cd-pw">새 비밀번호 (6자 이상) <span class="req">*</span></label>
+          <input id="cd-pw" type="password" autocomplete="new-password" required>
+        </div>
+        <div class="field">
+          <label for="cd-pw2">새 비밀번호 확인 <span class="req">*</span></label>
+          <input id="cd-pw2" type="password" autocomplete="new-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary" id="btn-code-submit">비밀번호 설정하고 로그인</button>
+      </form>
+      <button type="button" class="btn btn-ghost btn-sm" data-go-simple style="width:100%;margin-top:10px;">← 로그인으로 돌아가기</button>
+    </div>
+
+    <!-- ---- gate: 비밀번호 초기화 요청 ---- -->
+    <div id="gate-resetreq" hidden>
+      <h1>비밀번호 초기화 요청</h1>
+      <p class="login-sub">연락처를 입력하면 전체관리자에게 요청이 갑니다.<br>승인되면 <b>6자리 코드</b>를 받아 30분 안에 새 비밀번호를 정하세요.</p>
+
+      <div id="resetreq-error" class="login-error" hidden></div>
+
+      <form id="resetreq-form" novalidate>
+        <div class="field">
+          <label for="rr-phone">연락처 <span class="req">*</span></label>
+          <input id="rr-phone" type="tel" inputmode="numeric" placeholder="010-0000-0000" required maxlength="13">
+        </div>
+        <button type="submit" class="btn btn-primary" id="btn-resetreq-submit">초기화 요청</button>
+      </form>
+      <button type="button" class="btn btn-ghost btn-sm" data-go-simple style="width:100%;margin-top:10px;">← 로그인으로 돌아가기</button>
     </div>
 
     <!-- ---- gate: checking ---- -->
@@ -1355,6 +1413,24 @@
           <div id="all-members-body"><div class="empty-members">불러오는 중…</div></div>
         </div>
       </div>
+      <div class="card" id="auth-admin-card" style="margin-top:16px;">
+        <div style="padding:16px 16px 4px;">
+          <h3 style="font-size:13.5px;">로그인 전환 · 비밀번호 코드</h3>
+          <p class="chart-sub" style="margin-bottom:0;">기존 직원은 <b>첫 설정 코드</b>(영문+숫자 8자리, 24시간)로 비밀번호를 정합니다. 비밀번호 초기화 요청은 승인하면 <b>6자리 코드</b>(30분)가 나옵니다. 코드는 이 화면에서만 보입니다.</p>
+        </div>
+        <div style="padding:8px 16px 4px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+          <span id="auth-convert-status" class="chart-sub" style="margin:0;"></span>
+        </div>
+        <div style="padding:4px 16px 12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+          <label style="font-size:12px;color:var(--ink-muted);" for="bulk-code-scope">대상</label>
+          <select id="bulk-code-scope" class="branch-select" style="width:auto;"><option value="">승인된 직원 전체</option></select>
+          <label class="auto-login" style="margin:0;"><input type="checkbox" id="bulk-code-unconverted" checked> 아직 전환 안 한 직원만</label>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-bulk-codes" style="width:auto;">첫 설정 코드 일괄 발급</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-codes-excel" style="width:auto;">유효한 코드 엑셀 다운로드</button>
+        </div>
+        <div id="auth-requests-body"></div>
+        <div id="auth-codes-body"><div class="empty-members">불러오는 중…</div></div>
+      </div>
     </section>
   </main>
 
@@ -1517,6 +1593,7 @@
 <!-- going live.                                                          -->
 <!-- ==================================================================== -->
 <script src="https://www.gstatic.com/firebasejs/12.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.13.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.13.0/firebase-storage-compat.js"></script>
 
@@ -1589,7 +1666,8 @@
         var id = 'att_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
         var contentType = (opts && opts.type) || blob.type || 'application/octet-stream';
         var ref = storage.ref().child('attachments/' + id);
-        return ref.put(blob, { contentType: contentType }).then(function(snapshot){
+        // owner = 올린 사람 연락처 — storage.rules가 확인하고, 올린 본인만 지울 수 있게 함
+        return ref.put(blob, { contentType: contentType, customMetadata: { owner: myAuthId() } }).then(function(snapshot){
           return ref.getDownloadURL().then(function(url){
             return { id: id, url: url, sizeBytes: snapshot.totalBytes, contentType: contentType };
           });
@@ -1703,11 +1781,8 @@
       return null;
     }catch(e){ return null; }
   }
-  function saveIdentity(id){
-    var raw = JSON.stringify(id);
-    try{ localStorage.removeItem(LS_KEY); sessionStorage.removeItem(LS_KEY); }catch(e){}
-    try{ (autoLogin ? localStorage : sessionStorage).setItem(LS_KEY, raw); }catch(e){}
-  }
+  // 로그인 유지는 Firebase Authentication이 맡으므로 지점·이름·연락처를 브라우저에 저장하지 않음
+  function saveIdentity(id){ clearIdentity(); }
   function clearIdentity(){
     try{ localStorage.removeItem(LS_KEY); sessionStorage.removeItem(LS_KEY); }catch(e){}
   }
@@ -1845,38 +1920,98 @@
     });
   }
 
+  /* ---- Firebase Authentication: 화면은 "연락처 + 비밀번호", 내부는 이메일/비밀번호 ---- */
+  // 연락처 → 로그인용 이메일. 실제로 메일을 보내지 않습니다. (firestore.rules / storage.rules의 도메인과 같아야 함)
+  var AUTH_EMAIL_DOMAIN = 'jjangkait001.firebaseapp.com';
+  var SETUP_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // 헷갈리는 0·O·1·I·L 제외 (firestore.rules validCode와 같아야 함)
+  var CODE_TTL_MS = { setup: 24*60*60*1000, reset: 30*60*1000 }; // 첫 설정 24시간 / 초기화 30분 (firestore.rules codeTtl과 같아야 함)
+  var authObj = null;
+  var authBusy = false;   // 등록·코드 처리 중에는 onAuthStateChanged가 화면을 바꾸지 않음
+  var currentGate = 'simple';
+
+  function getAuth(){
+    if(!authObj && typeof firebase !== 'undefined' && firebase.auth){
+      try{ getFirebaseApp(); authObj = firebase.auth(); }catch(e){ console.error('auth init failed', e); }
+    }
+    return authObj;
+  }
+  function legacyEmail(d){ return d + '@' + AUTH_EMAIL_DOMAIN; }
+  function randChars(abc, n){
+    var a = new Uint32Array(n), s = '';
+    crypto.getRandomValues(a);
+    for(var i = 0; i < n; i++) s += abc[a[i] % abc.length];
+    return s;
+  }
+  // 최고관리자는 콘솔에서 미리 만든 <연락처>@ 계정, 그 외는 남이 미리 만들 수 없게 랜덤 문자를 붙임
+  function newAuthEmail(d){ return d === ADMIN_PHONE_DIGITS ? legacyEmail(d) : d + '_' + randChars('abcdefghijkmnpqrstuvwxyz23456789', 10) + '@' + AUTH_EMAIL_DOMAIN; }
+  function idFromAuthUser(u){ return u && u.email ? u.email.split('@')[0].split('_')[0] : ''; }
+  function myAuthId(){ var a = getAuth(); return a && a.currentUser ? idFromAuthUser(a.currentUser) : ''; }
+  function memberAuthEmail(id, m){ return (m && m.authEmail) || (id === ADMIN_PHONE_DIGITS ? legacyEmail(id) : ''); }
+  function lookupLoginEmail(db, d){
+    return db.collection('logins').doc(d).get()
+      .then(function(s){ return s.exists && s.data().email ? s.data().email : legacyEmail(d); })
+      .catch(function(){ return legacyEmail(d); });
+  }
+  function authErrorMessage(err){
+    var c = (err && err.code) || '';
+    if(c === 'auth/invalid-credential' || c === 'auth/wrong-password' || c === 'auth/user-not-found' || c === 'auth/invalid-login-credentials')
+      return '연락처 또는 비밀번호가 맞지 않습니다. 기존 직원이 처음 이용한다면 아래 "코드로 비밀번호 설정"을 이용하세요.';
+    if(c === 'auth/weak-password') return '비밀번호는 6자 이상으로 정해주세요.';
+    if(c === 'auth/too-many-requests') return '시도 횟수가 너무 많습니다. 잠시 후 다시 시도해주세요.';
+    if(c === 'auth/network-request-failed') return '네트워크 연결을 확인해주세요.';
+    if(c === 'auth/operation-not-allowed') return '로그인 방식이 아직 설정되지 않았습니다. 전체관리자에게 문의해주세요.';
+    return '오류가 발생했습니다. (' + (c || 'unknown') + ')';
+  }
+  function setPersistence(auto){
+    return getAuth().setPersistence(auto ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION);
+  }
+  /* 쓰지 못하게 된 새 로그인 계정 정리 (실패해도 계속 진행) */
+  function dropAuthUser(user){
+    if(!user) return Promise.resolve();
+    return user.delete().catch(function(){ return getAuth().signOut(); }).catch(function(){});
+  }
+  function normCode(v){ return String(v || '').toUpperCase().replace(/[^0-9A-Z]/g, ''); }
+  function fmtCode(c){ return c && c.length === 8 ? c.slice(0, 4) + '-' + c.slice(4) : (c || ''); }
+  function showFormError(sel, msg){ var el = $(sel); if(!el) return; el.textContent = msg || ''; el.hidden = !msg; }
+
   function initLogin(){
     initBranchCombo();
-
-    $('#in-phone').addEventListener('input', function(e){
-      e.target.value = formatPhoneInput(e.target.value);
+    ['#in-phone', '#sl-phone', '#cd-phone', '#rr-phone'].forEach(function(s){
+      $(s).addEventListener('input', function(e){ e.target.value = formatPhoneInput(e.target.value); });
     });
 
+    // 신규 등록
     $('#login-form').addEventListener('submit', function(e){
       e.preventDefault();
       var branch = $('#in-branch').value.trim();
       var name = $('#in-name').value.trim();
       var phone = $('#in-phone').value.trim();
-
-      if(!branch || !name || !phone){
-        showLoginError('지점, 이름, 연락처를 모두 입력해주세요.');
-        return;
-      }
-      if(digitsOnly(phone).length < 9){
-        showLoginError('연락처를 정확히 입력해주세요.');
-        return;
-      }
+      var pw = $('#in-pw').value, pw2 = $('#in-pw2').value;
+      if(!branch || !name || !phone){ showLoginError('지점, 이름, 연락처를 모두 입력해주세요.'); return; }
+      if(digitsOnly(phone).length < 9){ showLoginError('연락처를 정확히 입력해주세요.'); return; }
+      if(pw.length < 6){ showLoginError('비밀번호는 6자 이상으로 정해주세요.'); return; }
+      if(pw !== pw2){ showLoginError('비밀번호 확인이 일치하지 않습니다.'); return; }
       showLoginError('', true);
       autoLogin = $('#in-auto').checked;
-      routeIdentity({ branch: branch, name: name, phone: phone });
+      registerMember({ branch: branch, name: name, phone: formatPhoneInput(phone) }, pw);
     });
 
-    $('#sl-phone').addEventListener('input', function(e){ e.target.value = formatPhoneInput(e.target.value); });
-    $('#btn-go-register').addEventListener('click', function(){ showLoginError('', true); showGate('form'); });
-    $('#btn-go-simple').addEventListener('click', function(){ showSimpleError('', true); showGate('simple'); });
     $('#simple-form').addEventListener('submit', function(e){
       e.preventDefault();
-      simpleLogin($('#sl-name').value.trim(), $('#sl-phone').value.trim());
+      passwordLogin($('#sl-phone').value.trim(), $('#sl-pw').value);
+    });
+    $('#code-form').addEventListener('submit', function(e){ e.preventDefault(); setPasswordWithCode(); });
+    $('#resetreq-form').addEventListener('submit', function(e){ e.preventDefault(); requestPasswordReset(); });
+
+    $('#btn-go-register').addEventListener('click', function(){ showLoginError('', true); showGate('form'); });
+    $('#btn-go-code').addEventListener('click', function(){ showCodeGate(''); });
+    $('#btn-go-resetreq').addEventListener('click', function(){
+      showFormError('#resetreq-error', '');
+      if(!$('#rr-phone').value) $('#rr-phone').value = $('#sl-phone').value;
+      showGate('resetreq');
+    });
+    $all('[data-go-simple]').forEach(function(b){
+      b.addEventListener('click', function(){ showSimpleError('', true); showGate('simple'); });
     });
 
     $('#btn-pending-logout').addEventListener('click', doLogout);
@@ -1889,34 +2024,24 @@
     el.hidden = !!hide || !msg;
   }
 
-  /* 간편 로그인: 이미 등록된 이름 + 연락처만 확인 (신규 등록은 별도 버튼) */
-  function simpleLogin(name, phone){
-    var digits = digitsOnly(phone);
-    if(!name || !digits){ showSimpleError('이름과 연락처를 입력해주세요.'); return; }
-    if(digits.length < 9){ showSimpleError('연락처를 정확히 입력해주세요.'); return; }
+  /* 로그인: 연락처로 현재 계정 이메일을 찾아 비밀번호로 로그인 → onAuthStateChanged → subscribeMember */
+  function passwordLogin(phone, pw){
+    var d = digitsOnly(phone);
+    if(!d || !pw){ showSimpleError('연락처와 비밀번호를 입력해주세요.'); return; }
+    if(d.length < 9){ showSimpleError('연락처를 정확히 입력해주세요.'); return; }
     showSimpleError('', true);
     autoLogin = $('#sl-auto').checked;
-    var squash = function(v){ return String(v||'').replace(/\s+/g,''); };
     showGate('checking');
     resolveDb().then(function(db){
-      if(!db){ showGate('simple'); showSimpleError('서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.'); return; }
-      db.collection('members').doc(digits).get().then(function(snap){
-        if(!snap.exists){
-          if(digits === ADMIN_PHONE_DIGITS && squash(name) === squash(ADMIN_NAME)){
-            state.memberKey = digits; routeIdentity({ branch: ADMIN_BRANCH, name: ADMIN_NAME, phone: phone }); return;
-          }
-          showGate('simple'); showSimpleError('등록된 정보가 없습니다. 아래 "신규 등록"을 이용해주세요.'); return;
-        }
-        var m = snap.data();
-        if(squash(m.name) !== squash(name)){
-          showGate('simple'); showSimpleError('이름이 등록된 정보와 일치하지 않습니다.'); return;
-        }
-        state.memberKey = digits;
-        subscribeMember(db, digits);
-      }).catch(function(err){
-        console.error('simple login failed', err);
-        showGate('simple'); showSimpleError('확인 중 오류가 발생했습니다. 다시 시도해주세요.');
-      });
+      if(!db || !getAuth()){ var x = new Error('no-db'); x.code = 'no-db'; throw x; }
+      return setPersistence(autoLogin)
+        .then(function(){ return lookupLoginEmail(db, d); })
+        .then(function(email){ return getAuth().signInWithEmailAndPassword(email, pw); })
+        .then(function(){ $('#sl-pw').value = ''; });
+    }).catch(function(err){
+      console.error('login failed', err);
+      showGate('simple');
+      showSimpleError(err && err.code === 'no-db' ? '서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.' : authErrorMessage(err));
     });
   }
 
@@ -1927,13 +2052,22 @@
   }
 
   function showGate(which){
-    ['simple','form','checking','pending','rejected'].forEach(function(g){
+    currentGate = which;
+    ['simple','form','code','resetreq','checking','pending','rejected'].forEach(function(g){
       $('#gate-' + g).hidden = (g !== which);
     });
   }
 
+  function showCodeGate(okMsg){
+    showFormError('#code-error', '');
+    showFormError('#code-ok', okMsg || '');
+    if(!$('#cd-phone').value) $('#cd-phone').value = $('#sl-phone').value;
+    $('#screen-login').hidden = false;
+    $('#app').hidden = true;
+    showGate('code');
+  }
+
   function showPendingScreen(member){
-    if(member && member.branch && member.name && member.phone) saveIdentity({ branch:member.branch, name:member.name, phone:member.phone, role:member.role || 'requester' });
     $('#pending-branch').textContent = member.branch || '-';
     $('#pending-name').textContent = member.name || '-';
     $('#pending-phone').textContent = member.phone || '-';
@@ -1948,12 +2082,87 @@
     showGate('rejected');
   }
 
+  /* 승인 취소·권한 변경·로그아웃 시 열려 있던 실시간 구독을 닫음 (규칙상 읽기 거부가 나기 전에) */
+  function stopAppData(){
+    ['ticketsUnsub', 'membersUnsub', 'settingsUnsub', 'resetReqUnsub', 'resetCodeUnsub'].forEach(function(k){
+      if(state[k]){ try{ state[k](); }catch(e){} state[k] = null; }
+    });
+  }
+
   function doLogout(){
     if(state.memberUnsub){ state.memberUnsub(); state.memberUnsub = null; }
-    if(state.membersUnsub){ state.membersUnsub(); state.membersUnsub = null; }
-    if(state.settingsUnsub){ state.settingsUnsub(); state.settingsUnsub = null; }
+    stopAppData();
     clearIdentity();
-    window.location.reload();
+    var done = function(){ window.location.reload(); };
+    var a = getAuth();
+    if(a) a.signOut().then(done, done); else done();
+  }
+
+  /* 비밀번호 초기화 요청 (로그인 없이) */
+  function requestPasswordReset(){
+    var d = digitsOnly($('#rr-phone').value), errSel = '#resetreq-error';
+    if(!/^01\d{8,9}$/.test(d)){ showFormError(errSel, '연락처를 정확히 입력해주세요.'); return; }
+    if(d === ADMIN_PHONE_DIGITS){ showFormError(errSel, '최고관리자 계정은 화면에서 초기화할 수 없습니다. Firebase 콘솔에서 처리해주세요.'); return; }
+    showFormError(errSel, '');
+    var btn = $('#btn-resetreq-submit');
+    btn.disabled = true;
+    resolveDb().then(function(db){
+      if(!db){ var x = new Error('no-db'); x.code = 'no-db'; throw x; }
+      return db.collection('resetRequests').doc(d).set({ phone: d, requestedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    }).then(function(){
+      $('#cd-phone').value = formatPhoneInput(d);
+      showCodeGate('초기화를 요청했습니다. 전체관리자에게 6자리 코드를 받아 30분 안에 입력해주세요.');
+    }).catch(function(err){
+      console.error('reset request failed', err);
+      showFormError(errSel, '요청하지 못했습니다. (' + ((err && err.code) || 'unknown') + ')');
+    }).then(function(){ btn.disabled = false; });
+  }
+
+  /* 코드(첫 설정 8자리 / 초기화 6자리)로 새 로그인 계정을 만들고 회원 정보에 연결
+     — 승인·지점·권한·이름은 그대로. 코드가 틀리거나 만료면 규칙이 전부 거부하고, 만든 계정은 지움 */
+  function setPasswordWithCode(){
+    var d = digitsOnly($('#cd-phone').value), code = normCode($('#cd-code').value);
+    var pw = $('#cd-pw').value, pw2 = $('#cd-pw2').value, errSel = '#code-error';
+    showFormError('#code-ok', '');
+    if(!/^01\d{8,9}$/.test(d)){ showFormError(errSel, '연락처를 정확히 입력해주세요.'); return; }
+    if(d === ADMIN_PHONE_DIGITS){ showFormError(errSel, '최고관리자 계정은 화면에서 설정할 수 없습니다. Firebase 콘솔에서 처리해주세요.'); return; }
+    if(!(code.length === 8 || (code.length === 6 && /^\d{6}$/.test(code)))){ showFormError(errSel, '코드를 정확히 입력해주세요. (영문+숫자 8자리 또는 숫자 6자리)'); return; }
+    if(pw.length < 6){ showFormError(errSel, '새 비밀번호는 6자 이상으로 정해주세요.'); return; }
+    if(pw !== pw2){ showFormError(errSel, '새 비밀번호 확인이 일치하지 않습니다.'); return; }
+    showFormError(errSel, '');
+    var btn = $('#btn-code-submit');
+    btn.disabled = true;
+    authBusy = true;
+    var created = null, email = newAuthEmail(d), dbRef = null;
+
+    resolveDb().then(function(db){
+      if(!db || !getAuth()){ var x = new Error('no-db'); x.code = 'no-db'; throw x; }
+      dbRef = db;
+      return setPersistence(true)
+        .then(function(){ return getAuth().createUserWithEmailAndPassword(email, pw); })
+        .then(function(c){
+          created = c.user;
+          var b = db.batch();
+          b.update(db.collection('members').doc(d), { authEmail: email, lastResetCode: code, resetAt: firebase.firestore.FieldValue.serverTimestamp() });
+          b.delete(db.collection('resetCodes').doc(d + '_' + code));
+          b.set(db.collection('logins').doc(d), { email: email });
+          return b.commit();
+        });
+    }).then(function(){
+      $('#cd-code').value = ''; $('#cd-pw').value = ''; $('#cd-pw2').value = '';
+      authBusy = false;
+      state.memberKey = d;
+      subscribeMember(dbRef, d);
+    }).catch(function(err){
+      console.error('set password with code failed', err);
+      return dropAuthUser(created).then(function(){
+        authBusy = false;
+        showCodeGate('');
+        if(err && (err.code === 'permission-denied' || err.code === 'not-found')) showFormError(errSel, '코드가 맞지 않거나 만료되었습니다. 전체관리자에게 확인해주세요.');
+        else if(err && err.code && String(err.code).indexOf('auth/') === 0) showFormError(errSel, authErrorMessage(err));
+        else showFormError(errSel, '처리하지 못했습니다. (' + ((err && err.code) || 'unknown') + ')');
+      });
+    }).then(function(){ btn.disabled = false; });
   }
 
   /* ================================================================ */
@@ -1997,48 +2206,64 @@
     }
   }
 
-  function routeIdentity(rawIdentity){
-    showGate('checking');
+  /* 신규 등록: 새 로그인 계정 + 회원 문서(승인 대기·요청자) + logins 를 한 번에.
+     이미 등록된 직원(전환 전 포함)은 여기서 등록할 수 없고 첫 설정 코드를 써야 함 */
+  function registerMember(identity, pw){
+    var d = digitsOnly(identity.phone);
+    var isSuper = d === ADMIN_PHONE_DIGITS;
+    if(isSuper) identity = { branch: ADMIN_BRANCH, name: ADMIN_NAME, phone: identity.phone };
     $('#screen-login').hidden = false;
     $('#app').hidden = true;
-
-    var identity = rawIdentity;
-    if(isSuperAdminIdentity(identity)){
-      identity = { branch: ADMIN_BRANCH, name: ADMIN_NAME, phone: identity.phone };
-    }
+    showGate('checking');
+    authBusy = true;
+    var created = null;
 
     resolveDb().then(function(db){
-      if(!db){
-        // no persistent store available — allow local-only access, no approval gate
-        finalizeLogin(identity, isSuperAdminIdentity(identity) ? 'admin' : 'requester');
-        return;
-      }
-      var key = digitsOnly(identity.phone) || ('anon-' + Date.now());
-      state.memberKey = key;
-      var ref = db.collection('members').doc(key);
-      ref.get().then(function(snap){
-        if(!snap.exists){
-          var isSuper = isSuperAdminIdentity(identity);
-          var doc = {
+      if(!db || !getAuth()){ var x = new Error('no-db'); x.code = 'no-db'; throw x; }
+      var auth = getAuth();
+      return setPersistence(autoLogin).then(function(){
+        return auth.createUserWithEmailAndPassword(newAuthEmail(d), pw).then(function(c){ created = c.user; }, function(err){
+          // 최고관리자: 콘솔에서 미리 만든 계정이면 그 비밀번호로 로그인해서 이어감
+          if(isSuper && err.code === 'auth/email-already-in-use') return auth.signInWithEmailAndPassword(legacyEmail(d), pw);
+          throw err;
+        });
+      }).then(function(){
+        var email = auth.currentUser.email, ref = db.collection('members').doc(d);
+        return ref.get().then(function(snap){
+          if(snap.exists){
+            if(memberAuthEmail(d, snap.data()) === email) return; // 이미 연결된 본인
+            var x = new Error('exists'); x.code = 'app/exists'; throw x;
+          }
+          var t = nowIso(), b = db.batch();
+          b.set(ref, {
             branch: identity.branch,
             name: identity.name,
             phone: identity.phone,
             role: isSuper ? 'admin' : 'requester',
             status: isSuper ? 'approved' : 'pending',
-            requestedAt: nowIso(),
-            approvedAt: isSuper ? nowIso() : '',
-            approvedBy: isSuper ? '시스템(최초 관리자)' : ''
-          };
-          ref.set(doc).then(function(){ subscribeMember(db, key); }).catch(function(err){
-            console.error('member create failed', err);
-            finalizeLogin(identity, isSuper ? 'admin' : 'requester');
+            requestedAt: t,
+            approvedAt: isSuper ? t : '',
+            approvedBy: isSuper ? '시스템(최초 관리자)' : '',
+            authEmail: email
           });
-        } else {
-          subscribeMember(db, key);
-        }
-      }).catch(function(err){
-        console.error('member lookup failed', err);
-        finalizeLogin(identity, isSuperAdminIdentity(identity) ? 'admin' : 'requester');
+          b.set(db.collection('logins').doc(d), { email: email });
+          return b.commit();
+        });
+      }).then(function(){
+        $('#in-pw').value = ''; $('#in-pw2').value = '';
+        authBusy = false;
+        state.memberKey = d;
+        subscribeMember(db, d);
+      });
+    }).catch(function(err){
+      console.error('register failed', err);
+      return dropAuthUser(created).then(function(){
+        authBusy = false;
+        showGate('form');
+        if(err && err.code === 'app/exists') showLoginError('이미 등록된 연락처입니다. 기존 직원은 관리자에게 받은 첫 설정 코드로 "코드로 비밀번호 설정"을 이용하세요.');
+        else if(err && err.code === 'no-db') showLoginError('서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.');
+        else if(err && err.code && String(err.code).indexOf('auth/') === 0) showLoginError(authErrorMessage(err));
+        else showLoginError('등록 중 오류가 발생했습니다. (' + ((err && err.code) || 'unknown') + ')');
       });
     });
   }
@@ -2046,17 +2271,33 @@
   function subscribeMember(db, key){
     if(state.memberUnsub){ state.memberUnsub(); }
     state.memberUnsub = db.collection('members').doc(key).onSnapshot(function(snap){
-      if(!snap.exists){ showGate('simple'); $('#app').hidden = true; return; }
-      var m = snap.data();
+      var u = getAuth() && getAuth().currentUser;
+      var m = snap.exists ? snap.data() : null;
+      if(!m || (u && memberAuthEmail(key, m) !== u.email)){
+        // 회원 정보가 없거나, 다른 로그인 계정이 연결됨(비밀번호 초기화) / 아직 전환 전
+        if(state.memberUnsub){ state.memberUnsub(); state.memberUnsub = null; }
+        stopAppData();
+        state.identity = null;
+        var msg = !m ? '등록 정보가 없습니다. "신규 등록"을 이용해주세요.'
+          : (m.authEmail ? '비밀번호가 바뀌었습니다. 새 비밀번호로 로그인해주세요.'
+                         : '아직 비밀번호가 설정되지 않은 계정입니다. 관리자에게 받은 첫 설정 코드로 "코드로 비밀번호 설정"을 이용하세요.');
+        var show = function(){ $('#screen-login').hidden = false; $('#app').hidden = true; showGate('simple'); showSimpleError(msg); };
+        if(getAuth()) getAuth().signOut().then(show, show); else show();
+        return;
+      }
       if(m.status === 'approved'){
         finalizeLogin({ branch:m.branch, name:m.name, phone:m.phone }, m.role || 'requester');
-      } else if(m.status === 'rejected'){
-        showRejectedScreen();
       } else {
-        showPendingScreen(m);
+        stopAppData();
+        state.identity = null;
+        if(m.status === 'rejected') showRejectedScreen();
+        else showPendingScreen(m);
       }
     }, function(err){
       console.error('member onSnapshot error', err);
+      $('#screen-login').hidden = false; $('#app').hidden = true;
+      showGate('simple');
+      showSimpleError('회원 정보를 확인하지 못했습니다. (' + ((err && err.code) || 'unknown') + ')');
     });
   }
 
@@ -2086,6 +2327,9 @@
     $all('[data-tab="rules"]').forEach(function(b){ b.hidden = !isAdmin; });
     $all('[data-tab="list"]').forEach(function(b){ b.hidden = !canManageList; });
     $all('[data-tab="stats"]').forEach(function(b){ b.hidden = !canManageList; });
+    if(!isAdmin){
+      ['membersUnsub', 'resetReqUnsub', 'resetCodeUnsub'].forEach(function(k){ if(state[k]){ state[k](); state[k] = null; } });
+    }
     if(!isAdmin && (state.activeTab === 'members' || state.activeTab === 'rules')) setActiveTab('dashboard');
     if(!canManageList && (state.activeTab === 'list' || state.activeTab === 'stats')) setActiveTab('dashboard');
 
@@ -2239,6 +2483,7 @@
       notify('회원 목록을 불러오지 못했습니다. 다시 시도해주세요. [' + state.membersErrorCode + ']');
       renderMembers();
     });
+    subscribeAuthAdmin(db);
   }
 
   /* ================================================================ */
@@ -3699,10 +3944,8 @@
     var pending = state.members.filter(function(m){ return m.status === 'pending'; });
     var approvedAndBlocked = state.members.filter(function(m){ return m.status !== 'pending'; });
 
-    $all('#members-pending-badge-mobile, #members-pending-badge-desktop').forEach(function(badge){
-      if(pending.length){ badge.hidden = false; badge.textContent = pending.length; }
-      else { badge.hidden = true; }
-    });
+    updateMembersBadge();
+    renderAuthAdmin();
 
     var pendingBody = $('#pending-members-body');
     if(!pending.length){
@@ -3824,6 +4067,197 @@
       console.error('branch change failed', err);
       notify('지점 변경에 실패했습니다.');
     });
+  }
+
+  /* ================================================================ */
+  /* 로그인 전환 · 비밀번호 코드 (전체관리자)                              */
+  /*  - 첫 설정 코드: 영문+숫자 8자리, 24시간 — 승인된 직원 전체/지점별 일괄 발급 + 엑셀  */
+  /*  - 초기화 코드 : 숫자 6자리, 30분 — 초기화 요청을 승인하면 발급                  */
+  /* ================================================================ */
+  function subscribeAuthAdmin(db){
+    var snapList = function(snap){
+      return snap.docs.map(function(d){ var r = Object.assign({}, d.data({ serverTimestamps: 'estimate' }) || {}); r.id = d.id; return r; });
+    };
+    if(!state.resetReqUnsub){
+      state.resetReqUnsub = db.collection('resetRequests').onSnapshot(function(snap){
+        state.resetReqs = snapList(snap); updateMembersBadge(); renderAuthAdmin();
+      }, function(err){ console.error('reset requests watch failed', err); state.resetReqUnsub = null; });
+    }
+    if(!state.resetCodeUnsub){
+      state.resetCodeUnsub = db.collection('resetCodes').onSnapshot(function(snap){
+        state.resetCodes = snapList(snap); renderAuthAdmin();
+      }, function(err){ console.error('reset codes watch failed', err); state.resetCodeUnsub = null; });
+    }
+  }
+
+  function updateMembersBadge(){
+    var n = state.members.filter(function(m){ return m.status === 'pending'; }).length + (state.resetReqs || []).length;
+    $all('#members-pending-badge-mobile, #members-pending-badge-desktop').forEach(function(badge){
+      if(n){ badge.hidden = false; badge.textContent = n; } else { badge.hidden = true; }
+    });
+  }
+
+  function tsMs(t){ return t && t.toMillis ? t.toMillis() : (typeof t === 'number' ? t : 0); }
+  function codeExpiresMs(c){ return tsMs(c.createdAt) + (CODE_TTL_MS[c.kind] || CODE_TTL_MS.reset); }
+  function memberById(id){ return state.members.filter(function(m){ return m.id === id; })[0] || null; }
+  function convertTargets(){ return state.members.filter(function(m){ return m.status === 'approved' && m.id !== ADMIN_PHONE_DIGITS; }); }
+  function fmtLeft(ms){
+    if(ms <= 0) return '만료됨';
+    var min = Math.ceil(ms / 60000);
+    return min >= 60 ? Math.floor(min / 60) + '시간 ' + (min % 60) + '분 남음' : min + '분 남음';
+  }
+
+  function renderAuthAdmin(){
+    if(!state.identity || state.identity.role !== 'admin' || !$('#auth-codes-body')) return;
+    var now = Date.now();
+    var targets = convertTargets();
+    var done = targets.filter(function(m){ return !!m.authEmail; }).length;
+    $('#auth-convert-status').innerHTML = '로그인 전환: <b>' + done + '</b> / ' + targets.length + '명 완료 · 미전환 <b>' + (targets.length - done) + '</b>명';
+
+    // 일괄 발급 대상(지점) 목록
+    var sel = $('#bulk-code-scope'), cur = sel.value;
+    var branches = {};
+    targets.forEach(function(m){ if(m.branch) branches[m.branch] = (branches[m.branch] || 0) + 1; });
+    sel.innerHTML = '<option value="">승인된 직원 전체 (' + targets.length + '명)</option>' +
+      Object.keys(branches).sort(function(a, b){ return a.localeCompare(b, 'ko'); }).map(function(b){
+        return '<option value="' + esc(b) + '"' + (b === cur ? ' selected' : '') + '>' + esc(b) + ' (' + branches[b] + '명)</option>';
+      }).join('');
+
+    // 초기화 요청
+    var reqs = (state.resetReqs || []).slice().sort(function(a, b){ return tsMs(a.requestedAt) - tsMs(b.requestedAt); });
+    $('#auth-requests-body').innerHTML = reqs.length ? reqs.map(function(r){
+      var m = memberById(r.id);
+      return '<div class="member-row"><div class="who"><div class="nm">' + (m ? esc(m.name) : '<span style="color:var(--ink-muted)">미등록 번호</span>') +
+        ' <span style="font-size:11px;color:var(--critical);">비밀번호 초기화 요청</span></div>' +
+        '<div class="meta">' + esc(formatPhoneInput(r.id)) + (m ? ' · ' + esc(m.branch) : '') + ' · ' + fmtDateFull(new Date(tsMs(r.requestedAt)).toISOString()) + '</div></div>' +
+        '<div class="actions">' +
+          (m ? '<button type="button" class="btn btn-primary btn-sm" data-code-issue="' + esc(r.id) + '" style="width:auto;">승인 (6자리 코드)</button> ' : '') +
+          '<button type="button" class="btn btn-ghost btn-sm" data-code-dismiss="' + esc(r.id) + '" style="width:auto;">거절</button>' +
+        '</div></div>';
+    }).join('') : '';
+
+    // 발급된 코드
+    var codes = (state.resetCodes || []).slice().sort(function(a, b){ return tsMs(b.createdAt) - tsMs(a.createdAt); });
+    var valid = codes.filter(function(c){ return codeExpiresMs(c) > now; }).length;
+    $('#auth-codes-body').innerHTML = codes.length ?
+      '<div style="padding:0 16px 6px;font-size:12px;color:var(--ink-muted);">발급된 코드 ' + codes.length + '건 (유효 ' + valid + '건)' +
+        (codes.length > valid ? ' · <button type="button" class="btn btn-ghost btn-sm" data-code-purge="1" style="width:auto;padding:2px 8px;">만료된 코드 정리</button>' : '') + '</div>' +
+      codes.slice(0, 300).map(function(c){
+        var m = memberById(c.phone), left = codeExpiresMs(c) - now;
+        return '<div class="member-row"><div class="who"><div class="nm">' + esc(m ? m.name : '-') +
+          ' <span style="font-size:11px;color:var(--ink-muted);">' + (c.kind === 'setup' ? '첫 설정' : '초기화') + '</span></div>' +
+          '<div class="meta">' + esc(formatPhoneInput(c.phone)) + (m ? ' · ' + esc(m.branch) : '') + ' · ' + fmtLeft(left) + '</div></div>' +
+          '<div class="actions"><b style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px;letter-spacing:1px;' + (left > 0 ? '' : 'opacity:.4;text-decoration:line-through;') + '">' + esc(fmtCode(c.code)) + '</b> ' +
+          '<button type="button" class="btn btn-ghost btn-sm" data-code-cancel="' + esc(c.id) + '" style="width:auto;">' + (left > 0 ? '취소' : '정리') + '</button></div></div>';
+      }).join('') + (codes.length > 300 ? '<div class="empty-members">외 ' + (codes.length - 300) + '건 — 엑셀로 확인하세요.</div>' : '')
+      : '<div class="empty-members">발급된 코드가 없습니다.</div>';
+  }
+
+  function newSetupCode(){ return randChars(SETUP_CODE_CHARS, 8); }
+  function newResetCode(){ var a = new Uint32Array(1); crypto.getRandomValues(a); return String(a[0] % 1000000 + 1000000).slice(1); }
+
+  /* ops = [{del:id} | {set:{phone, code, kind}}] 를 400개씩 나눠 저장 */
+  function commitCodeOps(ops){
+    var db = state.db, i = 0, actor = memberActor();
+    function next(){
+      if(i >= ops.length) return Promise.resolve();
+      var b = db.batch();
+      ops.slice(i, i + 400).forEach(function(op){
+        if(op.del) b.delete(db.collection('resetCodes').doc(op.del));
+        else if(op.delReq) b.delete(db.collection('resetRequests').doc(op.delReq));
+        else b.set(db.collection('resetCodes').doc(op.set.phone + '_' + op.set.code), {
+          phone: op.set.phone, code: op.set.code, kind: op.set.kind,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: actor
+        });
+      });
+      i += 400;
+      return b.commit().then(next);
+    }
+    return next();
+  }
+  function oldCodeOps(phone){
+    return (state.resetCodes || []).filter(function(c){ return c.phone === phone; }).map(function(c){ return { del: c.id }; });
+  }
+
+  function issueResetCode(phone){
+    if(!state.db || phone === ADMIN_PHONE_DIGITS) return;
+    var code = newResetCode();
+    var ops = oldCodeOps(phone).concat([{ set: { phone: phone, code: code, kind: 'reset' } }, { delReq: phone }]);
+    commitCodeOps(ops).then(function(){
+      var m = memberById(phone);
+      notify((m ? m.name + ' · ' : '') + '초기화 코드 ' + code + ' (30분) — 본인에게 전달해주세요.');
+    }).catch(function(err){ console.error('issue reset code failed', err); notify('코드를 발급하지 못했습니다. [' + (err.code || 'unknown') + ']'); });
+  }
+
+  function bulkIssueSetupCodes(){
+    if(!state.db) return;
+    var scope = $('#bulk-code-scope').value, onlyNew = $('#bulk-code-unconverted').checked;
+    var list = convertTargets().filter(function(m){ return (!scope || m.branch === scope) && (!onlyNew || !m.authEmail); });
+    if(!list.length){ notify('발급할 대상이 없습니다.'); return; }
+    var label = (scope || '승인된 직원 전체') + (onlyNew ? ' · 미전환' : '');
+    showConfirm(label + ' ' + list.length + '명에게 첫 설정 코드(24시간)를 발급합니다.\n이미 발급된 코드는 새 코드로 바뀝니다. 발급 후 엑셀 파일이 내려받아집니다.', function(){
+      var btn = $('#btn-bulk-codes'); btn.disabled = true;
+      var issued = [], ops = [];
+      list.forEach(function(m){
+        var code = newSetupCode();
+        ops = ops.concat(oldCodeOps(m.id));
+        ops.push({ set: { phone: m.id, code: code, kind: 'setup' } });
+        issued.push({ name: m.name, branch: m.branch, phone: m.phone || formatPhoneInput(m.id), kind: '첫 설정', code: fmtCode(code), expires: Date.now() + CODE_TTL_MS.setup });
+      });
+      commitCodeOps(ops).then(function(){
+        notify(list.length + '명에게 첫 설정 코드를 발급했습니다. 엑셀 파일을 전달한 뒤에는 지워주세요.');
+        return downloadCodeRows(issued, '첫설정코드_' + (scope || '전체'));
+      }).catch(function(err){
+        console.error('bulk setup codes failed', err);
+        notify('코드를 발급하지 못했습니다. [' + (err.code || 'unknown') + ']');
+      }).then(function(){ btn.disabled = false; });
+    });
+  }
+
+  function downloadValidCodes(){
+    var now = Date.now();
+    var rows = (state.resetCodes || []).filter(function(c){ return codeExpiresMs(c) > now; }).map(function(c){
+      var m = memberById(c.phone);
+      return { name: m ? m.name : '', branch: m ? m.branch : '', phone: m ? m.phone : formatPhoneInput(c.phone), kind: c.kind === 'setup' ? '첫 설정' : '초기화', code: fmtCode(c.code), expires: codeExpiresMs(c) };
+    });
+    if(!rows.length){ notify('유효한 코드가 없습니다.'); return; }
+    downloadCodeRows(rows, '유효한코드');
+  }
+
+  function downloadCodeRows(rows, prefix){
+    rows.sort(function(a, b){ return (a.branch || '').localeCompare(b.branch || '', 'ko') || (a.name || '').localeCompare(b.name || '', 'ko'); });
+    var fmtTime = function(ms){ return new Date(ms).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }); };
+    var aoa = [['지점', '이름', '연락처', '구분', '코드', '만료 시각', '안내']].concat(rows.map(function(r){
+      return [r.branch, r.name, r.phone, r.kind, r.code, fmtTime(r.expires), '로그인 화면 → 코드로 비밀번호 설정 → 연락처·코드·새 비밀번호 입력'];
+    }));
+    return loadXlsxLib().then(function(XLSX){
+      var ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = [{ wch: 16 }, { wch: 10 }, { wch: 15 }, { wch: 8 }, { wch: 12 }, { wch: 20 }, { wch: 52 }];
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '코드');
+      var d = new Date(), p2 = function(n){ return (n < 10 ? '0' : '') + n; };
+      XLSX.writeFile(wb, prefix + '_' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '_' + p2(d.getHours()) + p2(d.getMinutes()) + '.xlsx');
+    }).catch(function(err){ console.error('code excel failed', err); notify('엑셀 파일을 만들지 못했습니다. 코드는 발급되어 있으니 "유효한 코드 엑셀 다운로드"로 다시 받으세요.'); });
+  }
+
+  function initAuthAdmin(){
+    $('#btn-bulk-codes').addEventListener('click', bulkIssueSetupCodes);
+    $('#btn-codes-excel').addEventListener('click', downloadValidCodes);
+    $('#auth-admin-card').addEventListener('click', function(e){
+      var b = e.target.closest('[data-code-issue],[data-code-dismiss],[data-code-cancel],[data-code-purge]');
+      if(!b || !state.db) return;
+      var p;
+      if(b.hasAttribute('data-code-issue')) return issueResetCode(b.getAttribute('data-code-issue'));
+      if(b.hasAttribute('data-code-dismiss')) p = state.db.collection('resetRequests').doc(b.getAttribute('data-code-dismiss')).delete();
+      else if(b.hasAttribute('data-code-cancel')) p = state.db.collection('resetCodes').doc(b.getAttribute('data-code-cancel')).delete();
+      else if(b.hasAttribute('data-code-purge')){
+        var now = Date.now();
+        p = commitCodeOps((state.resetCodes || []).filter(function(c){ return codeExpiresMs(c) <= now; }).map(function(c){ return { del: c.id }; }));
+      }
+      if(p) p.catch(function(err){ notify('처리하지 못했습니다. [' + (err.code || 'unknown') + ']'); });
+    });
+    // 남은 시간 표시 갱신
+    setInterval(function(){ if(state.activeTab === 'members') renderAuthAdmin(); }, 60000);
   }
 
   /* 지점을 고를 때 쓰는 select 옵션(회원관리·접수목록 공용) — 등록된 전체 지점 목록
@@ -4647,11 +5081,33 @@
     bindConfirmAndNotify();
     bindGlobalEvents();
 
-    var existing = loadIdentity();
-    if(existing){
-      try{ autoLogin = !!localStorage.getItem(LS_KEY); }catch(e){}
-      routeIdentity(existing);
-    }
+    initAuthAdmin();
+    clearIdentity(); // 예전 버전이 저장하던 지점·이름·연락처 정리
+
+    var auth = getAuth();
+    if(!auth){ showGate('simple'); showSimpleError('서버에 연결할 수 없습니다. 인터넷 연결을 확인해주세요.'); return; }
+    showGate('checking');
+    // 자동 로그인: 저장된 로그인 상태가 있으면 회원 정보 확인으로 이어감
+    auth.onAuthStateChanged(function(u){
+      if(authBusy) return; // 등록·코드 처리 중에는 해당 함수가 직접 이어서 처리
+      if(u){
+        var d = idFromAuthUser(u);
+        $('#sl-phone').value = formatPhoneInput(d);
+        state.memberKey = d;
+        resolveDb().then(function(db){
+          if(db) subscribeMember(db, d);
+          else { showGate('simple'); showSimpleError('서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.'); }
+        });
+      } else {
+        if(state.memberUnsub){ state.memberUnsub(); state.memberUnsub = null; }
+        stopAppData();
+        state.identity = null;
+        if(['code', 'form', 'resetreq'].indexOf(currentGate) === -1){
+          $('#screen-login').hidden = false; $('#app').hidden = true;
+          showGate('simple');
+        }
+      }
+    });
   }
 
   if(document.readyState === 'loading'){
