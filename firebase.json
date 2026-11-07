@@ -10,7 +10,17 @@
       "migration/**",
       "node_modules/**",
       "_backup/**",
-      "deploy.bat"
+      "deploy.bat",
+      "**/.*",
+      ".git/**",
+      ".github/**",
+      ".firebaserc",
+      "package.json",
+      "package-lock.json",
+      "serviceAccountKey.json",
+      "*.serviceaccount.json",
+      "Claude outputs/**",
+      "**/node_modules/**"
     ],
     "rewrites": [
       {
